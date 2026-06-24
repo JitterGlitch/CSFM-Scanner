@@ -1,0 +1,709 @@
+import os
+import struct
+import math
+from collections import defaultdict
+from enum import Enum
+
+
+
+class Opcodes(Enum):
+    END = 0
+    TIME = 1
+    MIKU_MOVE = 2
+    MIKU_DISP = 4
+    TARGET = 6
+    CHANGE_FIELD = 14
+    MUSIC_PLAY = 25
+    PV_END = 32
+    SCENE_FADE = 52
+    TARGET_FLYING_TIME = 58
+    MOVIE_PLAY = 67
+    MOVIE_DISP = 68
+
+
+class TargetTypes(Enum):
+    Triangle = 0
+    Circle = 1
+    Cross = 2
+    Square = 3
+    TriangleHold = 4
+    CircleHold = 5
+    CrossHold = 6
+    SquareHold = 7
+    SlideL = 12
+    SlideR = 13
+    SlideChainL = 15
+    SlideChainR = 16
+    TriangleChance = 18
+    CircleChance = 19
+    CrossChance = 20
+    SquareChance = 21
+    SlideLChance = 23
+    SlideRChance = 24
+
+class ChartProperties(Enum):
+    Scale = "scale"
+    Time = "time"
+    Targets = "targets"
+    TempoMap = "tempo_map"
+    ButtonSounds = "button_sounds"
+    Difficulty = "difficulty"
+
+class ChartTimeProperties(Enum):
+    SongOffset = "Song Offset"
+    MovieOffset = "Movie Offset"
+    Duration = "Duration"
+    SongPreviewStart = "Song Preview Start"
+    SongPreviewDuration = "Song Preview Duration"
+
+class CSFMSection(Enum):
+    Metadata = "Metadata"
+    Chart = "Chart"
+    Debug = "Debug"
+
+class HeaderProperties(Enum):
+    MajorVersion = "major_version"
+    MinorVersion = "minor_version"
+    Endianness = "endianness"
+    PointerSize = "pointer_size"
+    Flags = "flags"
+    CreationTime = "creation_time"
+    Encoding = "encoding"
+
+class ScaleProperties(Enum):
+    TicksPerBeat = "ticks_per_beat"
+    PlacementArea = "placement_area"
+    FullAngleRotation = "full_angle_rotation"
+    ButtonTypeNames = "button_type_names"
+
+class TargetProperties(Enum):
+    Tick = "Tick"
+    Type = "Type"
+    Properties = "Properties"
+    Hold = "Hold"
+    Chain = "Chain"
+    Chance = "Chance"
+    Position = "Position"
+    Angle = "Angle"
+    Frequency = "Frequency"
+    Amplitude = "Amplitude"
+    Distance = "Distance"
+
+class TempoMapProperties(Enum):
+    Tick = "Tick"
+    Tempo = "Tempo"
+    FlyingTimeFactor = "Flying Time Factor"
+    TimeSignature = "Time Signature"
+    Flags = "Flags"
+
+class TempoMapFlags(Enum):
+    HasTempo = "has_tempo"
+    HasFlyingTime = "has_flying_time"
+    HasSignature = "has_signature"
+
+class ButtonSounds(Enum):
+    ButtonID = "ButtonID"
+    SlideID = "SlideID"
+    ChainSlideID = "ChainSlideID"
+    SliderTouchID = "SliderTouchID"
+
+class DifficultyProperties(Enum):
+    Type = "Type"
+    Version = "Version"
+    LevelWhole = "LevelWhole"
+    LevelFraction = "LevelFraction"
+
+class MetadataProperties(Enum):
+    SongFileName = "Song File Name"
+    MovieFileName = "Movie File Name"
+    SongTitle = "Song Title"
+    TrackNumber = "Track Number"
+    DiskNumber = "Disk Number"
+
+def get_target_type_enum(target):
+    btn_type = target.get("Type", 3)
+    is_hold = bool(target.get("Hold", 0))
+    is_chain = bool(target.get("Chain", 0))
+    is_chance = bool(target.get("Chance", 0))
+
+    if btn_type == 0:
+        return TargetTypes.TriangleHold if is_hold else (TargetTypes.TriangleChance if is_chance else TargetTypes.Triangle)
+    elif btn_type == 1:
+        return TargetTypes.SquareHold if is_hold else (TargetTypes.SquareChance if is_chance else TargetTypes.Square)
+    elif btn_type == 2:
+        return TargetTypes.CrossHold if is_hold else (TargetTypes.CrossChance if is_chance else TargetTypes.Cross)
+    elif btn_type == 3:
+        return TargetTypes.CircleHold if is_hold else (TargetTypes.CircleChance if is_chance else TargetTypes.Circle)
+    elif btn_type == 4:
+        return TargetTypes.SlideChainL if is_chain else (TargetTypes.SlideLChance if is_chance else TargetTypes.SlideL)
+    elif btn_type == 5:
+        return TargetTypes.SlideChainR if is_chain else (TargetTypes.SlideRChance if is_chance else TargetTypes.SlideR)
+
+    return TargetTypes.Circle
+
+
+def calculate_time_seconds(tick, ticks_per_beat, tempo_map):
+    total_seconds = 0.0
+    last_tick = 0
+    current_bpm = tempo_map[0]['Tempo'] if tempo_map and 'Tempo' in tempo_map[0] else 120.0
+
+    for tc in tempo_map:
+        tc_tick = tc.get('Tick', 0)
+        if tc_tick >= tick:
+            break
+        beats_spent = (tc_tick - last_tick) / ticks_per_beat
+        total_seconds += beats_spent * (60.0 / current_bpm)
+        last_tick = tc_tick
+        if tc.get('Flags', {}).get('has_tempo', True) and 'Tempo' in tc:
+            current_bpm = tc['Tempo']
+
+    remaining_beats = (tick - last_tick) / ticks_per_beat
+    total_seconds += remaining_beats * (60.0 / current_bpm)
+    return total_seconds
+
+
+def export_chart_to_dsc(parsed_data, output_filepath, has_song=True, has_movie=True):
+    chart = parsed_data["chart"]
+    time_data = chart["time"]
+    tpb = chart["scale"]["ticks_per_beat"]
+    tempo_map = chart["tempo_map"]
+
+    timeline = defaultdict(list)
+
+    def queue_command(seconds, opcode, params=[]):
+        time_point = int(seconds * 100000.0)
+        timeline[time_point].append((opcode, params))
+
+    song_offset = abs(time_data.get("Song Offset")) if has_song else 0.0
+    movie_offset = abs(time_data.get("Movie Offset")) if has_movie else 0.0
+
+    delay_offset = max(song_offset, movie_offset, 0.0)
+
+
+    song_play_time = song_offset #it needs to factor in delay_offset
+    movie_play_time = movie_offset #it needs to factor in delay_offset
+
+    print(song_offset)
+    print(delay_offset)
+
+    print(song_play_time)
+    print(movie_play_time)
+
+    queue_command(0.0, Opcodes.CHANGE_FIELD, [1])
+    queue_command(0.0, Opcodes.MIKU_DISP, [0, 0])  # Index 0, Hidden
+
+
+    if has_song:
+        queue_command(song_play_time, Opcodes.MUSIC_PLAY, [])
+    if has_movie:
+        queue_command(movie_play_time, Opcodes.MOVIE_PLAY, [1])
+        queue_command(movie_play_time, Opcodes.MOVIE_DISP, [1])
+
+    last_flying_time = -1
+    last_processed_time = 0.0
+    min_gap = 0.0001
+
+    for target in chart["targets"]:
+        target_tick = target.get("Tick", 0)
+        raw_seconds = calculate_time_seconds(target_tick, tpb, tempo_map)
+        target_seconds = max(0.0, raw_seconds - delay_offset)
+
+        if 0.0 < (target_seconds - last_processed_time) <= min_gap:
+            target_seconds = last_processed_time + min_gap
+        last_processed_time = target_seconds
+
+        flying_time_ms = 1500
+        if flying_time_ms != last_flying_time:
+            queue_command(target_seconds, Opcodes.TARGET_FLYING_TIME, [flying_time_ms])
+            last_flying_time = flying_time_ms
+
+        pos_x, pos_y = target.get("Position", (0.0, 0.0))
+        angle = target.get("Angle", 0.0)
+        distance = target.get("Distance", 0.0)
+        amplitude = target.get("Amplitude", 0.0)
+        frequency = target.get("Frequency", 0.0)
+
+        target_params = [
+            get_target_type_enum(target),
+            int(pos_x * 250.0),
+            int(pos_y * 250.0),
+            int(angle * 1000.0),
+            int(distance * 250.0),
+            int(amplitude),
+            int(frequency)
+        ]
+        queue_command(target_seconds, Opcodes.TARGET, target_params)
+
+    duration_seconds = time_data.get("Duration", 0.0) + delay_offset
+    queue_command(duration_seconds, Opcodes.PV_END, [])
+
+    binary_data = bytearray(struct.pack('<I', 0x14050921))
+
+    for time_point in sorted(timeline.keys()):
+        binary_data.extend(struct.pack('<Ii', Opcodes.TIME, time_point))
+
+        for opcode, params in timeline[time_point]:
+            binary_data.extend(struct.pack('<I', opcode))
+            for p in params:
+                binary_data.extend(struct.pack('<i', p))
+
+    binary_data.extend(struct.pack('<I', Opcodes.END))
+
+    with open(output_filepath, 'wb') as f:
+        f.write(binary_data)
+
+    print(f"Successfully serialized valid binary PVScript to: {output_filepath}")
+
+def get_time_from_tick(target_tick,parser):
+    tempo_map = parser.chart[ChartProperties.TempoMap.value]
+    ticks_per_beat = parser.chart[ChartProperties.Scale.value][ScaleProperties.TicksPerBeat.value]
+
+    total_seconds = 0.0
+    last_tick = 0
+
+    current_bpm = 160.0
+    if tempo_map and 'Tempo' in tempo_map[0]:
+        current_bpm = tempo_map[0]['Tempo']
+
+    for tc in tempo_map:
+        tc_tick = tc.get('Tick', 0)
+
+        if tc_tick >= target_tick:
+            break
+
+        ticks_spent = tc_tick - last_tick
+        beats_spent = ticks_spent / ticks_per_beat
+        total_seconds += beats_spent * (60.0 / current_bpm)
+
+        last_tick = tc_tick
+        if tc.get('Flags', {}).get('has_tempo', True) and 'Tempo' in tc:
+            current_bpm = tc['Tempo']
+
+    remaining_ticks = target_tick - last_tick
+    remaining_beats = remaining_ticks / ticks_per_beat
+    total_seconds += remaining_beats * (60.0 / current_bpm)
+
+    minutes = int(total_seconds // 60)
+    seconds = int(total_seconds % 60)
+    milliseconds = int((total_seconds * 1000) % 1000)
+
+    return f"{minutes:02d}:{seconds:02d}.{milliseconds:03d}"
+def get_time_from_duration(duration):
+    total_seconds = duration
+
+    minutes = int(total_seconds // 60)
+    seconds = int(total_seconds % 60)
+    milliseconds = int((total_seconds * 1000) % 1000)
+
+    return f"{minutes:02d}:{seconds:02d}.{milliseconds:03d}"
+
+def get_difficulty(parsed_diff_dict):
+    type = parsed_diff_dict[DifficultyProperties.Type.value]
+    version = parsed_diff_dict[DifficultyProperties.Version.value]
+    whole = parsed_diff_dict[DifficultyProperties.LevelWhole.value]
+    fraction = parsed_diff_dict[DifficultyProperties.LevelFraction.value]
+
+    difficulty_string = ""
+    if not version == 0:
+        difficulty_string = "Extra "
+
+    match type:
+        case 0:
+            difficulty_string = difficulty_string + "Easy"
+        case 1:
+            difficulty_string = difficulty_string + "Normal"
+        case 2:
+            difficulty_string = difficulty_string + "Hard"
+        case 3:
+            difficulty_string = difficulty_string + "Extreme"
+
+    return f"{difficulty_string} {whole}.{fraction}"
+
+def get_note_spawn_point(target):
+    position = target[TargetProperties.Position.value]
+    angle = target[TargetProperties.Angle.value]
+    distance = target[TargetProperties.Distance.value]
+
+    angle_rad = math.radians(angle+270)
+
+    x = position[0]
+    y = position[1]
+
+    dx = distance * math.cos(angle_rad)
+    dy = distance * math.sin(angle_rad)
+
+    return x + dx, y + dy
+
+def check_if_point_in_visible_area(position):
+    button_size = 24
+    visible_area = (0-button_size,0-button_size,1920+button_size,1080+button_size)
+
+
+    x = position[0]
+    y = position[1]
+
+    if x < visible_area[0]:
+        return False
+    if x > visible_area[2]:
+        return False
+    if y < visible_area[1]:
+        return False
+    if y > visible_area[3]:
+        return False
+    return True
+class CsfmParser:
+    MAGIC_BYTES = b'CSFM'
+
+    def __init__(self):
+        self.header = {}
+        self.metadata = {}
+        self.chart = {
+            "scale": {},
+            "time": {},
+            "targets": [],
+            "tempo_map": [],
+            "button_sounds": {},
+            "difficulty": {}
+        }
+
+    @staticmethod
+    def read_u8(f):
+        return struct.unpack('<B', f.read(1))[0]
+
+    @staticmethod
+    def read_i16(f):
+        return struct.unpack('<h', f.read(2))[0]
+
+    @staticmethod
+    def read_u16(f):
+        return struct.unpack('<H', f.read(2))[0]
+
+    @staticmethod
+    def read_i32(f):
+        return struct.unpack('<i', f.read(4))[0]
+
+    @staticmethod
+    def read_u32(f):
+        return struct.unpack('<I', f.read(4))[0]
+
+    @staticmethod
+    def read_u64(f):
+        return struct.unpack('<Q', f.read(8))[0]
+
+    @staticmethod
+    def read_f32(f):
+        return struct.unpack('<f', f.read(4))[0]
+
+    @staticmethod
+    def read_f64(f):
+        return struct.unpack('<d', f.read(8))[0]
+
+    @staticmethod
+    def read_str_at(f, offset):
+        if offset == 0:
+            return ""
+
+        original_pos = f.tell()
+        f.seek(offset)
+
+        chars = bytearray()
+        while True:
+            c = f.read(1)
+            if not c or c == b'\x00':
+                break
+            chars.extend(c)
+
+        f.seek(original_pos)
+        return chars.decode('utf-8', errors='ignore')
+
+    @staticmethod
+    def read_str_ptr(f):
+        offset = CsfmParser.read_u64(f)
+        return CsfmParser.read_str_at(f, offset)
+
+    def parse(self, filepath: str):
+        with open(filepath, 'rb') as f:
+            self._parse_header(f)
+
+            creator_info_address = f.tell()
+            creator_info_size = self.read_u64(f)
+            f.seek(creator_info_address + creator_info_size)
+
+            section_count = self.read_u64(f)
+            sections_offset = self.read_u64(f)
+            self.read_u64(f)  # Reserved / Padding
+            self.read_u64(f)  # Reserved / Padding
+
+            if section_count < 1 or sections_offset == 0:
+                return
+
+            f.seek(sections_offset)
+            for _ in range(section_count):
+                section_name = self.read_str_ptr(f)
+                section_offset = self.read_u64(f)
+                self.read_u64(f)  # Padding
+                self.read_u64(f)  # Padding
+
+                if section_offset == 0:
+                    continue
+
+                pos = f.tell()
+                f.seek(section_offset)
+
+                if section_name == "Metadata":
+                    self._parse_metadata_section(f)
+                elif section_name == "Chart":
+                    self._parse_chart_section(f)
+
+                f.seek(pos)
+
+    def _parse_header(self, f):
+        magic = f.read(4)
+        if magic != self.MAGIC_BYTES:
+            raise ValueError(f"Invalid file magic: {magic}. Expected CSFM.")
+
+        self.header = {
+            "major_version": self.read_u16(f),
+            "minor_version": self.read_u16(f),
+            "endianness": f.read(2).decode('ascii'),
+            "pointer_size": self.read_u16(f),
+            "flags": self.read_u32(f),
+            "creation_time": self.read_u64(f),
+            "encoding": f.read(8).decode('ascii').strip('\x00')
+        }
+        f.read(32)  # 8x u32 Reserved bytes
+
+    def _parse_metadata_section(self, f):
+        entry_count = self.read_u64(f)
+        entries_offset = self.read_u64(f)
+        self.read_u64(f)  # Padding
+        self.read_u64(f)  # Padding
+
+        if entries_offset == 0:
+            return
+
+        f.seek(entries_offset)
+        for _ in range(entry_count):
+            key = self.read_str_ptr(f)
+            val = self.read_str_ptr(f)
+            self.read_u64(f)  # Padding
+            self.read_u64(f)  # Padding
+            self.metadata[key] = val
+
+    def _parse_chart_section(self, f):
+        chart_section_count = self.read_u64(f)
+        chart_sections_offset = self.read_u64(f)
+        self.read_u64(f)  # Padding
+        self.read_u64(f)  # Padding
+
+        if chart_sections_offset == 0:
+            return
+
+        f.seek(chart_sections_offset)
+        for _ in range(chart_section_count):
+            name_id = self.read_str_ptr(f)
+            offset = self.read_u64(f)
+            self.read_u64(f)
+            self.read_u64(f)
+
+            if offset == 0:
+                continue
+
+            pos = f.tell()
+            f.seek(offset)
+
+            if name_id == "Scale":
+                self._parse_chart_scale(f)
+            elif name_id == "Time":
+                self._parse_chart_time(f)
+            elif name_id == "Targets":
+                self._parse_chart_targets(f)
+            elif name_id == "Tempo Map":
+                self._parse_chart_tempo_map(f)
+            elif name_id == "Button Sounds":
+                self._parse_chart_button_sounds(f)
+            elif name_id == "Difficulty":
+                self._parse_chart_difficulty(f)
+
+            f.seek(pos)
+
+    def _parse_chart_scale(self, f):
+        btn_type_count = self.read_u64(f)
+        btn_types_offset = self.read_u64(f)
+
+        self.chart["scale"]["ticks_per_beat"] = self.read_i32(f)
+        self.read_i32(f)  # padding
+        self.chart["scale"]["placement_area"] = (self.read_f32(f), self.read_f32(f))
+
+        rotation = self.read_f32(f)
+        self.chart["scale"]["full_angle_rotation"] = 360.0 if rotation == 0.0 else rotation
+
+        self.read_u32(f)  # padding
+        for _ in range(3): self.read_u64(f)  # padding
+
+        if btn_types_offset != 0:
+            pos = f.tell()
+            f.seek(btn_types_offset)
+            btn_names = [self.read_str_ptr(f) for _ in range(btn_type_count)]
+            self.chart["scale"]["button_type_names"] = btn_names
+            f.seek(pos)
+
+    def _parse_chart_time(self, f):
+        entry_count = self.read_u64(f)
+        entries_offset = self.read_u64(f)
+        self.read_u64(f)
+        self.read_u64(f)
+
+        if entries_offset != 0:
+            f.seek(entries_offset)
+            for _ in range(entry_count):
+                key = self.read_str_ptr(f)
+                val = self.read_f64(f)  # Timespan read as seconds
+                self.read_u64(f)
+                self.read_u64(f)
+                self.chart["time"][key] = val
+
+    def _parse_chart_targets(self, f):
+        target_count = self.read_u64(f)
+        field_count = self.read_u64(f)
+        fields_offset = self.read_u64(f)
+        self.read_u64(f)
+
+        # Initialize the targets array
+        self.chart["targets"] = [{} for _ in range(target_count)]
+
+        if fields_offset == 0:
+            return
+
+        f.seek(fields_offset)
+        for _ in range(field_count):
+            name_id = self.read_str_ptr(f)
+            byte_size = self.read_u64(f)
+            array_size = self.read_u64(f)
+            field_offset = self.read_u64(f)
+            self.read_u64(f)
+            self.read_u64(f)
+
+            if field_offset != 0:
+                pos = f.tell()
+                f.seek(field_offset)
+
+                # SoA: Read this specific property for ALL targets sequentially
+                for i in range(target_count):
+                    val = None
+                    if name_id == "Tick":
+                        val = self.read_i32(f)
+                    elif name_id in ["Type", "Properties", "Hold", "Chain", "Chance"]:
+                        val = self.read_u8(f)
+                    elif name_id == "Position":
+                        val = (self.read_f32(f), self.read_f32(f))
+                    elif name_id in ["Angle", "Frequency", "Amplitude", "Distance"]:
+                        val = self.read_f32(f)
+
+                    if val is not None:
+                        self.chart["targets"][i][name_id] = val
+                f.seek(pos)
+
+    def _parse_chart_tempo_map(self, f):
+        tempo_count = self.read_u64(f)
+        field_count = self.read_u64(f)
+        fields_offset = self.read_u64(f)
+        self.read_u64(f)
+
+        self.chart["tempo_map"] = [{} for _ in range(tempo_count)]
+
+        if fields_offset == 0:
+            return
+
+        f.seek(fields_offset)
+        for _ in range(field_count):
+            name_id = self.read_str_ptr(f)
+            byte_size = self.read_u64(f)
+            array_size = self.read_u64(f)
+            field_offset = self.read_u64(f)
+            self.read_u64(f)
+            self.read_u64(f)
+
+            if field_offset != 0:
+                pos = f.tell()
+                f.seek(field_offset)
+
+                for i in range(tempo_count):
+                    val = None
+                    if name_id == "Tick":
+                        val = self.read_i32(f)
+                    elif name_id == "Tempo":
+                        val = self.read_f32(f)
+                    elif name_id == "Flying Time Factor":
+                        val = self.read_f32(f)
+                    elif name_id == "Time Signature":
+                        val = (self.read_i16(f), self.read_i16(f))  # Numerator, Denominator
+                    elif name_id == "Flags":
+                        flags = self.read_u32(f)
+                        val = {
+                            "has_tempo": bool(flags & 1),
+                            "has_flying_time": bool((flags >> 1) & 1),
+                            "has_signature": bool((flags >> 2) & 1)
+                        }
+
+                    if val is not None:
+                        self.chart["tempo_map"][i][name_id] = val
+                f.seek(pos)
+
+    def _parse_chart_button_sounds(self, f):
+        btn_count = self.read_u64(f)
+        btn_offset = self.read_u64(f)
+        self.read_u64(f)
+        self.read_u64(f)
+
+        if btn_offset != 0 and btn_count >= 4:
+            f.seek(btn_offset)
+            self.chart["button_sounds"] = {
+                "ButtonID": self.read_u32(f),
+                "SlideID": self.read_u32(f),
+                "ChainSlideID": self.read_u32(f),
+                "SliderTouchID": self.read_u32(f)
+            }
+
+    def _parse_chart_difficulty(self, f):
+        self.chart["difficulty"] = {
+            "Type": self.read_u8(f),
+            "Version": self.read_u8(f),
+            "LevelWhole": self.read_u8(f),
+            "LevelFraction": self.read_u8(f)
+        }
+        self.read_u64(f)
+        self.read_u64(f)
+
+def scan_folder(folder):
+    directory = os.fsencode(folder)
+
+    for file in os.listdir(directory):
+        filename = os.fsdecode(file)
+        if filename.endswith(".csfm"):
+            scan_csfm("/home/jitterglitch/PycharmProjects/CSFM-Helper/Test Data/Kinema106 Song Pack/" + str(filename))
+
+def scan_csfm(file):
+    parser.parse(file)
+
+    print(parser.metadata[MetadataProperties.SongTitle.value])
+    print(get_time_from_duration(parser.chart[ChartProperties.Time.value][ChartTimeProperties.Duration.value]))
+    print(get_difficulty(parser.chart[ChartProperties.Difficulty.value]))
+
+    for note in parser.chart[ChartProperties.Targets.value]:
+        point = get_note_spawn_point(note)
+
+        if check_if_point_in_visible_area(point):
+            print(f"At {get_time_from_tick(note[TargetProperties.Tick.value], parser)} Note spawns on screen. Exact spawn position {point}")
+
+if __name__ == "__main__":
+    parser = CsfmParser()
+
+    scan_folder("/home/jitterglitch/PycharmProjects/CSFM-Helper/Test Data/Kinema106 Song Pack")
+
+    #scan_csfm("/home/jitterglitch/PycharmProjects/CSFM-Helper/Test Data/Zaako/Zako HD.csfm")
+
+
+
+
+
