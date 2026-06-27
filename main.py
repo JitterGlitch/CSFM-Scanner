@@ -297,6 +297,48 @@ def get_time_from_duration(duration):
 
     return f"{minutes:02d}:{seconds:02d}.{milliseconds:03d}"
 
+def get_flying_time_at_tick(tick,parser):
+    current_flying_time = 1
+    for tempo_map_entry in parser.chart[ChartProperties.TempoMap.value]:
+        if tempo_map_entry[TempoMapProperties.Tick.value] <= tick:
+            current_flying_time = tempo_map_entry[TempoMapProperties.FlyingTimeFactor.value]
+        else:
+            break
+
+    return current_flying_time*100
+def get_target_section(tick,beats,parser):
+    current_tick = tick
+    targets = parser.chart[ChartProperties.Targets.value]
+    ticks_per_beat = parser.chart[ChartProperties.Scale.value][ScaleProperties.TicksPerBeat.value]
+
+    ticks_in_window = beats * ticks_per_beat
+
+    lower_bound = current_tick - ticks_in_window
+
+    recent_targets = [
+        t for t in targets
+        if lower_bound <= t.get("Tick") < current_tick
+    ]
+    return recent_targets
+
+def convert_flying_time_to_amount_of_beats_for_fancy_note(flying_time_percent):
+    if flying_time_percent is None:
+        return 4.0
+
+    if flying_time_percent < 100:
+        return 4 + (100 - flying_time_percent) / 25.0
+    elif flying_time_percent > 100:
+        return 4 - (flying_time_percent - 100) / 100.0
+    else:
+        return 4.0
+
+def get_first_target_from_section(recent_targets):
+    target_list = []
+    for target in recent_targets:
+        if target[TargetProperties.Tick.value] == recent_targets[0][TargetProperties.Tick.value]:
+            target_list.append(target)
+
+    return target_list
 def get_difficulty(parsed_diff_dict):
     type = parsed_diff_dict[DifficultyProperties.Type.value]
     version = parsed_diff_dict[DifficultyProperties.Version.value]
@@ -324,7 +366,7 @@ def get_note_spawn_point(target):
     angle = target[TargetProperties.Angle.value]
     distance = target[TargetProperties.Distance.value]
 
-    angle_rad = math.radians(angle+270)
+    angle_rad = math.radians(angle-90)
 
     x = position[0]
     y = position[1]
@@ -335,7 +377,7 @@ def get_note_spawn_point(target):
     return x + dx, y + dy
 
 def check_if_point_in_visible_area(position):
-    button_size = 24
+    button_size = 24 #37 if being stupid autistic about it, complains about shadow spawning on screen
     visible_area = (0-button_size,0-button_size,1920+button_size,1080+button_size)
 
 
@@ -351,6 +393,24 @@ def check_if_point_in_visible_area(position):
     if y > visible_area[3]:
         return False
     return True
+
+def round_position(position):
+    return round(position[0],None),round(position[1],None)
+def filter_target_properties(section, key:TargetProperties):
+    filtered_list = []
+    for target in section:
+        filtered_list.append(target[key.value])
+    return filtered_list
+
+def position_check_with_tolerance(position, last_section_positions, precision=5.0):
+    #Ideally autistic precision of 1 would be used, that however is overkill for faster songs where it's hard to spot misaligment
+
+    x, y = position
+    for ref_x, ref_y in last_section_positions:
+        distance = math.hypot(x - ref_x, y - ref_y)
+        if distance <= precision:
+            return True
+    return False
 class CsfmParser:
     MAGIC_BYTES = b'CSFM'
 
@@ -694,14 +754,31 @@ def scan_csfm(file):
         point = get_note_spawn_point(note)
 
         if check_if_point_in_visible_area(point):
-            print(f"At {get_time_from_tick(note[TargetProperties.Tick.value], parser)} Note spawns on screen. Exact spawn position {point}")
+            #print(f'Before - {round_position(point)} last section positions {filter_target_properties(get_first_target_from_section(get_target_section(note[TargetProperties.Tick.value],2,parser)),TargetProperties.Position)}')
+
+            if position_check_with_tolerance(round_position(point),
+                                             filter_target_properties(get_first_target_from_section(get_target_section(note[TargetProperties.Tick.value],
+                                                                                                                       convert_flying_time_to_amount_of_beats_for_fancy_note(
+                                                                                                                           get_flying_time_at_tick(note[TargetProperties.Tick.value] -1 ,parser)),parser)),TargetProperties.Position)):
+                print(f"At {get_time_from_tick(note[TargetProperties.Tick.value], parser)} Note spawns from other note. Exact spawn position {round_position(point)}")
+
+
+            elif note[TargetProperties.Distance.value] == 0:
+                print(f"At {get_time_from_tick(note[TargetProperties.Tick.value], parser)} Phantom Note.")
+            else:
+                print(f"At {get_time_from_tick(note[TargetProperties.Tick.value], parser)} Note spawns on screen. Exact spawn position {round_position(point)}. Distance {note[TargetProperties.Distance.value]}")
+
+
 
 if __name__ == "__main__":
     parser = CsfmParser()
+    #parser.parse("/home/jitterglitch/PycharmProjects/CSFM-Helper/Test Data/Tempo Map info test.csfm")
 
-    scan_folder("/home/jitterglitch/PycharmProjects/CSFM-Helper/Test Data/Kinema106 Song Pack")
+    #scan_folder("/home/jitterglitch/PycharmProjects/CSFM-Helper/Test Data/Kinema106 Song Pack")
+    #scan_csfm("/home/jitterglitch/PycharmProjects/CSFM-Helper/Test Data/Zaako/Zako EXEX.csfm")
 
-    #scan_csfm("/home/jitterglitch/PycharmProjects/CSFM-Helper/Test Data/Zaako/Zako HD.csfm")
+    #scan_csfm("/home/jitterglitch/PycharmProjects/CSFM-Helper/Test Data/Kinema106 Song Pack/Suiso 9.5 EXEX.csfm")
+    scan_csfm("/home/jitterglitch/PycharmProjects/CSFM-Helper/Test Data/JitterGlitch Chart Pack/FOMENT - 7 HD.csfm")
 
 
 
