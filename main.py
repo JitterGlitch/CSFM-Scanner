@@ -139,6 +139,12 @@ class DifficultyOutput(Enum):
     Full = auto()
     StarRating = auto()
     Level = auto()
+
+class NoteCheck(Enum):
+    SpawnOnScreen = auto()
+    SpawnFromNote = auto()
+    PhantomNote = auto()
+
 def get_target_type_enum(target):
     btn_type = target.get("Type", 3)
     is_hold = bool(target.get("Hold", 0))
@@ -707,7 +713,6 @@ class CsfmParser:
                 return f"{difficulty_string}"
             case DifficultyOutput.StarRating:
                 return f"{whole}.{fraction}"
-
     def get_duration(self):
         total_seconds = self.chart[ChartProperties.Time.value][ChartTimeProperties.Duration.value]
 
@@ -726,7 +731,6 @@ class CsfmParser:
                 break
 
         return current_flying_time * 100
-
     def get_time_from_tick(self,target_tick):
         tempo_map = self.chart[ChartProperties.TempoMap.value]
         ticks_per_beat = self.chart[ChartProperties.Scale.value][ScaleProperties.TicksPerBeat.value]
@@ -761,7 +765,6 @@ class CsfmParser:
         milliseconds = int((total_seconds * 1000) % 1000)
 
         return f"{minutes:02d}:{seconds:02d}.{milliseconds:03d}"
-
     def get_target_section(self,tick, beats):
         current_tick = tick
         targets = self.chart[ChartProperties.Targets.value]
@@ -776,51 +779,60 @@ class CsfmParser:
             if lower_bound <= t.get("Tick") < current_tick
         ]
         return recent_targets
-def scan_folder(folder):
-    directory = os.fsencode(folder)
 
-    for file in os.listdir(directory):
-        filename = os.fsdecode(file)
-        if filename.endswith(".csfm"):
-            scan_csfm("/home/jitterglitch/PycharmProjects/CSFM-Helper/Test Data/Kinema106 Song Pack/" + str(filename))
-
-def scan_csfm(file):
-    parser.parse(file)
-
-    print(parser.get_song_name())
-    print(parser.get_duration())
-    print(parser.get_difficulty())
-
-    for note in parser.chart[ChartProperties.Targets.value]:
+    def note_check(self,check:NoteCheck,note):
         point = get_note_spawn_point(note)
+        match check:
+            case NoteCheck.SpawnOnScreen:
+                return check_if_point_in_visible_area(point)
+            case NoteCheck.SpawnFromNote:
+                return position_check_with_tolerance(round_position(point),
+                                                 filter_target_properties(
+                                                     get_first_target_from_section(
+                                                         self.get_target_section(note[TargetProperties.Tick.value],
+                                                                                 flying_time_to_beats(
+                                                                                     self.get_flying_time_at_tick(note[TargetProperties.Tick.value] - 1)))), TargetProperties.Position))
+            case NoteCheck.PhantomNote:
+                    return note[TargetProperties.Distance.value] == 0
 
-        if check_if_point_in_visible_area(point):
-            if position_check_with_tolerance(round_position(point),
-                                             filter_target_properties(get_first_target_from_section(parser.get_target_section(note[TargetProperties.Tick.value],
-                                                                                                                              flying_time_to_beats(
-                                                                                                                           parser.get_flying_time_at_tick(note[TargetProperties.Tick.value] -1)))),TargetProperties.Position)):
-                print(f"At {parser.get_time_from_tick(note[TargetProperties.Tick.value])} Note spawns from other note. Exact spawn position {round_position(point)}")
+    def scan_csfm(self,file):
+        self.parse(file)
+
+        print(self.get_song_name())
+        print(self.get_duration())
+        print(self.get_difficulty())
+        print("")
+        for note in self.chart[ChartProperties.Targets.value]:
+            point = get_note_spawn_point(note)
+
+            if self.note_check(NoteCheck.SpawnOnScreen, note):
+                if self.note_check(NoteCheck.SpawnFromNote, note):
+                    print(f"At {parser.get_time_from_tick(note[TargetProperties.Tick.value])} Note spawns from other note. Exact spawn position {round_position(point)}")
 
 
-            elif note[TargetProperties.Distance.value] == 0:
-                print(f"At {parser.get_time_from_tick(note[TargetProperties.Tick.value])} Phantom Note.")
-            else:
-                print(f"At {parser.get_time_from_tick(note[TargetProperties.Tick.value])} Note spawns on screen. Exact spawn position {round_position(point)}. Distance {note[TargetProperties.Distance.value]}")
+                elif self.note_check(NoteCheck.PhantomNote, note):
+                    print(f"At {self.get_time_from_tick(note[TargetProperties.Tick.value])} Phantom Note.")
+                else:
+                    print(f"At {self.get_time_from_tick(note[TargetProperties.Tick.value])} Note spawns on screen. Exact spawn position {round_position(point)}. Distance {note[TargetProperties.Distance.value]}")
+        print("")
+    def scan_folder(self,folder):
+        directory = os.fsencode(folder)
 
-
+        for file in os.listdir(directory):
+            filename = os.fsdecode(file)
+            if filename.endswith(".csfm"):
+                self.scan_csfm(str(folder)+ "/" + str(filename))
 
 if __name__ == "__main__":
     parser = CsfmParser()
-    parser.parse("/home/jitterglitch/PycharmProjects/CSFM-Helper/Test Data/Properties.csfm")
+    #parser.parse("/home/jitterglitch/PycharmProjects/CSFM-Helper/Test Data/Properties.csfm")
 
-    #scan_folder("/home/jitterglitch/PycharmProjects/CSFM-Helper/Test Data/Kinema106 Song Pack")
-    #scan_csfm("/home/jitterglitch/PycharmProjects/CSFM-Helper/Test Data/Zaako/Zako EXEX.csfm")
+    parser.scan_folder("/home/jitterglitch/PycharmProjects/CSFM-Helper/Test Data/Kinema106 Song Pack")
+    #parser.scan_csfm("/home/jitterglitch/PycharmProjects/CSFM-Helper/Test Data/Zaako/Zako EXEX.csfm")
 
     #scan_csfm("/home/jitterglitch/PycharmProjects/CSFM-Helper/Test Data/Kinema106 Song Pack/Suiso 9.5 EXEX.csfm")
     #scan_csfm("/home/jitterglitch/PycharmProjects/CSFM-Helper/Test Data/JitterGlitch Chart Pack/FOMENT - 7 HD.csfm")
     #scan_csfm("/home/jitterglitch/PycharmProjects/CSFM-Helper/Test Data/Note Spawn check.csfm")
-
-    print(parser.metadata)
 
 
 
