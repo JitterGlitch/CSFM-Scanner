@@ -281,6 +281,7 @@ def export_dsc(parsed_data, output_filepath, has_song=True, has_movie=True):
 
 def flying_time_to_beats(flying_time_percent):
     """Gets amount of beats it takes for note to fly in"""
+    #TODO Rename it to something that's more self-explanatory
     if flying_time_percent is None:
         return 4.0
 
@@ -341,7 +342,8 @@ def filter_target_properties(section, key:TargetProperties):
     return filtered_list
 
 def position_check_with_tolerance(position, last_section_positions, precision=5.0):
-    #Ideally autistic precision of 1 would be used, that however is overkill for faster songs where it's hard to spot misaligment
+    #Ideally autistic precision of 1 would be used,
+    # that however is overkill for faster songs where it's hard to spot misalignment
 
     x, y = position
     for ref_x, ref_y in last_section_positions:
@@ -564,7 +566,7 @@ class CsfmParser:
             f.seek(entries_offset)
             for _ in range(entry_count):
                 key = self._read_str_ptr(f)
-                val = self._read_f64(f)  # Timespan read as seconds
+                val = self._read_f64(f)
                 self._read_u64(f)
                 self._read_u64(f)
                 self.chart["time"][key] = val
@@ -575,7 +577,6 @@ class CsfmParser:
         fields_offset = self._read_u64(f)
         self._read_u64(f)
 
-        # Initialize the targets array
         self.chart["targets"] = [{} for _ in range(target_count)]
 
         if fields_offset == 0:
@@ -594,7 +595,6 @@ class CsfmParser:
                 pos = f.tell()
                 f.seek(field_offset)
 
-                # SoA: Read this specific property for ALL targets sequentially
                 for i in range(target_count):
                     val = None
                     if name_id == "Tick":
@@ -643,7 +643,7 @@ class CsfmParser:
                     elif name_id == "Flying Time Factor":
                         val = self._read_f32(f)
                     elif name_id == "Time Signature":
-                        val = (self._read_i16(f), self._read_i16(f))  # Numerator, Denominator
+                        val = (self._read_i16(f), self._read_i16(f))
                     elif name_id == "Flags":
                         flags = self._read_u32(f)
                         val = {
@@ -825,14 +825,9 @@ class CsfmParser:
 
 if __name__ == "__main__":
     parser = CsfmParser()
-    #parser.parse("/home/jitterglitch/PycharmProjects/CSFM-Helper/Test Data/Properties.csfm")
 
-    parser.scan_folder("/home/jitterglitch/PycharmProjects/CSFM-Helper/Test Data/Kinema106 Song Pack")
-    #parser.scan_csfm("/home/jitterglitch/PycharmProjects/CSFM-Helper/Test Data/Zaako/Zako EXEX.csfm")
+    parser.scan_csfm("/home/jitterglitch/PycharmProjects/CSFM-Helper/Test Data/Kinema106 Song Pack/Suiso 9.5 EXEX.csfm")
 
-    #scan_csfm("/home/jitterglitch/PycharmProjects/CSFM-Helper/Test Data/Kinema106 Song Pack/Suiso 9.5 EXEX.csfm")
-    #scan_csfm("/home/jitterglitch/PycharmProjects/CSFM-Helper/Test Data/JitterGlitch Chart Pack/FOMENT - 7 HD.csfm")
-    #scan_csfm("/home/jitterglitch/PycharmProjects/CSFM-Helper/Test Data/Note Spawn check.csfm")
 
 
 
