@@ -2,8 +2,7 @@ import os
 import struct
 import math
 from collections import defaultdict
-from enum import Enum
-
+from enum import Enum, auto
 
 
 class Opcodes(Enum):
@@ -117,9 +116,29 @@ class MetadataProperties(Enum):
     SongFileName = "Song File Name"
     MovieFileName = "Movie File Name"
     SongTitle = "Song Title"
+    Artist = "Artist"
+    Lyricist = "Lyricist"
+    Arranger = "Arranger"
     TrackNumber = "Track Number"
     DiskNumber = "Disk Number"
+    CreatorName = "Creator Name"
+    CreatorComment = "Creator Comment"
+    CoverFileName = "Cover File Name"
+    LogoFileName = "Logo File Name"
+    BackgroundFileName = "Background File Name"
+    ExtraInfoKey0 = "Extra Info Key 0"
+    ExtraInfoValue0 = "Extra Info Value 0"
+    ExtraInfoKey1 = "Extra Info Key 1"
+    ExtraInfoValue1 = "Extra Info Value 1"
+    ExtraInfoKey2 = "Extra Info Key 2"
+    ExtraInfoValue2 = "Extra Info Value 2"
+    ExtraInfoKey3 = "Extra Info Key 3"
+    ExtraInfoValue3 = "Extra Info Value 3"
 
+class DifficultyOutput(Enum):
+    Full = auto()
+    StarRating = auto()
+    Level = auto()
 def get_target_type_enum(target):
     btn_type = target.get("Type", 3)
     is_hold = bool(target.get("Hold", 0))
@@ -145,7 +164,7 @@ def get_target_type_enum(target):
 def calculate_time_seconds(tick, ticks_per_beat, tempo_map):
     total_seconds = 0.0
     last_tick = 0
-    current_bpm = tempo_map[0]['Tempo'] if tempo_map and 'Tempo' in tempo_map[0] else 120.0
+    current_bpm = tempo_map[0]['Tempo'] if tempo_map and 'Tempo' in tempo_map[0] else 160.0
 
     for tc in tempo_map:
         tc_tick = tc.get('Tick', 0)
@@ -162,7 +181,7 @@ def calculate_time_seconds(tick, ticks_per_beat, tempo_map):
     return total_seconds
 
 
-def export_chart_to_dsc(parsed_data, output_filepath, has_song=True, has_movie=True):
+def export_dsc(parsed_data, output_filepath, has_song=True, has_movie=True):
     chart = parsed_data["chart"]
     time_data = chart["time"]
     tpb = chart["scale"]["ticks_per_beat"]
@@ -254,74 +273,8 @@ def export_chart_to_dsc(parsed_data, output_filepath, has_song=True, has_movie=T
 
     print(f"Successfully serialized valid binary PVScript to: {output_filepath}")
 
-def get_time_from_tick(target_tick,parser):
-    tempo_map = parser.chart[ChartProperties.TempoMap.value]
-    ticks_per_beat = parser.chart[ChartProperties.Scale.value][ScaleProperties.TicksPerBeat.value]
-
-    total_seconds = 0.0
-    last_tick = 0
-
-    current_bpm = 160.0
-    if tempo_map and 'Tempo' in tempo_map[0]:
-        current_bpm = tempo_map[0]['Tempo']
-
-    for tc in tempo_map:
-        tc_tick = tc.get('Tick', 0)
-
-        if tc_tick >= target_tick:
-            break
-
-        ticks_spent = tc_tick - last_tick
-        beats_spent = ticks_spent / ticks_per_beat
-        total_seconds += beats_spent * (60.0 / current_bpm)
-
-        last_tick = tc_tick
-        if tc.get('Flags', {}).get('has_tempo', True) and 'Tempo' in tc:
-            current_bpm = tc['Tempo']
-
-    remaining_ticks = target_tick - last_tick
-    remaining_beats = remaining_ticks / ticks_per_beat
-    total_seconds += remaining_beats * (60.0 / current_bpm)
-
-    minutes = int(total_seconds // 60)
-    seconds = int(total_seconds % 60)
-    milliseconds = int((total_seconds * 1000) % 1000)
-
-    return f"{minutes:02d}:{seconds:02d}.{milliseconds:03d}"
-def get_time_from_duration(duration):
-    total_seconds = duration
-
-    minutes = int(total_seconds // 60)
-    seconds = int(total_seconds % 60)
-    milliseconds = int((total_seconds * 1000) % 1000)
-
-    return f"{minutes:02d}:{seconds:02d}.{milliseconds:03d}"
-
-def get_flying_time_at_tick(tick,parser):
-    current_flying_time = 1
-    for tempo_map_entry in parser.chart[ChartProperties.TempoMap.value]:
-        if tempo_map_entry[TempoMapProperties.Tick.value] <= tick:
-            current_flying_time = tempo_map_entry[TempoMapProperties.FlyingTimeFactor.value]
-        else:
-            break
-
-    return current_flying_time*100
-def get_target_section(tick,beats,parser):
-    current_tick = tick
-    targets = parser.chart[ChartProperties.Targets.value]
-    ticks_per_beat = parser.chart[ChartProperties.Scale.value][ScaleProperties.TicksPerBeat.value]
-
-    ticks_in_window = beats * ticks_per_beat
-
-    lower_bound = current_tick - ticks_in_window
-
-    recent_targets = [
-        t for t in targets
-        if lower_bound <= t.get("Tick") < current_tick
-    ]
-    return recent_targets
-
-def convert_flying_time_to_amount_of_beats_for_fancy_note(flying_time_percent):
+def flying_time_to_beats(flying_time_percent):
+    """Gets amount of beats it takes for note to fly in"""
     if flying_time_percent is None:
         return 4.0
 
@@ -339,27 +292,6 @@ def get_first_target_from_section(recent_targets):
             target_list.append(target)
 
     return target_list
-def get_difficulty(parsed_diff_dict):
-    type = parsed_diff_dict[DifficultyProperties.Type.value]
-    version = parsed_diff_dict[DifficultyProperties.Version.value]
-    whole = parsed_diff_dict[DifficultyProperties.LevelWhole.value]
-    fraction = parsed_diff_dict[DifficultyProperties.LevelFraction.value]
-
-    difficulty_string = ""
-    if not version == 0:
-        difficulty_string = "Extra "
-
-    match type:
-        case 0:
-            difficulty_string = difficulty_string + "Easy"
-        case 1:
-            difficulty_string = difficulty_string + "Normal"
-        case 2:
-            difficulty_string = difficulty_string + "Hard"
-        case 3:
-            difficulty_string = difficulty_string + "Extreme"
-
-    return f"{difficulty_string} {whole}.{fraction}"
 
 def get_note_spawn_point(target):
     position = target[TargetProperties.Position.value]
@@ -411,6 +343,7 @@ def position_check_with_tolerance(position, last_section_positions, precision=5.
         if distance <= precision:
             return True
     return False
+
 class CsfmParser:
     MAGIC_BYTES = b'CSFM'
 
@@ -427,39 +360,39 @@ class CsfmParser:
         }
 
     @staticmethod
-    def read_u8(f):
+    def _read_u8(f):
         return struct.unpack('<B', f.read(1))[0]
 
     @staticmethod
-    def read_i16(f):
+    def _read_i16(f):
         return struct.unpack('<h', f.read(2))[0]
 
     @staticmethod
-    def read_u16(f):
+    def _read_u16(f):
         return struct.unpack('<H', f.read(2))[0]
 
     @staticmethod
-    def read_i32(f):
+    def _read_i32(f):
         return struct.unpack('<i', f.read(4))[0]
 
     @staticmethod
-    def read_u32(f):
+    def _read_u32(f):
         return struct.unpack('<I', f.read(4))[0]
 
     @staticmethod
-    def read_u64(f):
+    def _read_u64(f):
         return struct.unpack('<Q', f.read(8))[0]
 
     @staticmethod
-    def read_f32(f):
+    def _read_f32(f):
         return struct.unpack('<f', f.read(4))[0]
 
     @staticmethod
-    def read_f64(f):
+    def _read_f64(f):
         return struct.unpack('<d', f.read(8))[0]
 
     @staticmethod
-    def read_str_at(f, offset):
+    def _read_str_at(f, offset):
         if offset == 0:
             return ""
 
@@ -477,32 +410,36 @@ class CsfmParser:
         return chars.decode('utf-8', errors='ignore')
 
     @staticmethod
-    def read_str_ptr(f):
-        offset = CsfmParser.read_u64(f)
-        return CsfmParser.read_str_at(f, offset)
+    def _read_str_ptr(f):
+        offset = CsfmParser._read_u64(f)
+        return CsfmParser._read_str_at(f, offset)
 
     def parse(self, filepath: str):
         with open(filepath, 'rb') as f:
-            self._parse_header(f)
+            try:
+                self._parse_header(f)
+            except ValueError:
+                print("Unsupported CSFM version!")
+                return
 
             creator_info_address = f.tell()
-            creator_info_size = self.read_u64(f)
+            creator_info_size = self._read_u64(f)
             f.seek(creator_info_address + creator_info_size)
 
-            section_count = self.read_u64(f)
-            sections_offset = self.read_u64(f)
-            self.read_u64(f)  # Reserved / Padding
-            self.read_u64(f)  # Reserved / Padding
+            section_count = self._read_u64(f)
+            sections_offset = self._read_u64(f)
+            self._read_u64(f)  # Reserved / Padding
+            self._read_u64(f)  # Reserved / Padding
 
             if section_count < 1 or sections_offset == 0:
                 return
 
             f.seek(sections_offset)
             for _ in range(section_count):
-                section_name = self.read_str_ptr(f)
-                section_offset = self.read_u64(f)
-                self.read_u64(f)  # Padding
-                self.read_u64(f)  # Padding
+                section_name = self._read_str_ptr(f)
+                section_offset = self._read_u64(f)
+                self._read_u64(f)  # Padding
+                self._read_u64(f)  # Padding
 
                 if section_offset == 0:
                     continue
@@ -523,48 +460,51 @@ class CsfmParser:
             raise ValueError(f"Invalid file magic: {magic}. Expected CSFM.")
 
         self.header = {
-            "major_version": self.read_u16(f),
-            "minor_version": self.read_u16(f),
+            "major_version": self._read_u16(f),
+            "minor_version": self._read_u16(f),
             "endianness": f.read(2).decode('ascii'),
-            "pointer_size": self.read_u16(f),
-            "flags": self.read_u32(f),
-            "creation_time": self.read_u64(f),
+            "pointer_size": self._read_u16(f),
+            "flags": self._read_u32(f),
+            "creation_time": self._read_u64(f),
             "encoding": f.read(8).decode('ascii').strip('\x00')
         }
         f.read(32)  # 8x u32 Reserved bytes
 
+        if self.header[HeaderProperties.MajorVersion.value] != 1:
+            raise ValueError(f"This version isn't supported. Only Arcade CSFM's are supported at this time!")
+
     def _parse_metadata_section(self, f):
-        entry_count = self.read_u64(f)
-        entries_offset = self.read_u64(f)
-        self.read_u64(f)  # Padding
-        self.read_u64(f)  # Padding
+        entry_count = self._read_u64(f)
+        entries_offset = self._read_u64(f)
+        self._read_u64(f)  # Padding
+        self._read_u64(f)  # Padding
 
         if entries_offset == 0:
             return
 
         f.seek(entries_offset)
         for _ in range(entry_count):
-            key = self.read_str_ptr(f)
-            val = self.read_str_ptr(f)
-            self.read_u64(f)  # Padding
-            self.read_u64(f)  # Padding
+            key = self._read_str_ptr(f)
+            val = self._read_str_ptr(f)
+            self._read_u64(f)  # Padding
+            self._read_u64(f)  # Padding
             self.metadata[key] = val
 
     def _parse_chart_section(self, f):
-        chart_section_count = self.read_u64(f)
-        chart_sections_offset = self.read_u64(f)
-        self.read_u64(f)  # Padding
-        self.read_u64(f)  # Padding
+        chart_section_count = self._read_u64(f)
+        chart_sections_offset = self._read_u64(f)
+        self._read_u64(f)  # Padding
+        self._read_u64(f)  # Padding
 
         if chart_sections_offset == 0:
             return
 
         f.seek(chart_sections_offset)
         for _ in range(chart_section_count):
-            name_id = self.read_str_ptr(f)
-            offset = self.read_u64(f)
-            self.read_u64(f)
-            self.read_u64(f)
+            name_id = self._read_str_ptr(f)
+            offset = self._read_u64(f)
+            self._read_u64(f)
+            self._read_u64(f)
 
             if offset == 0:
                 continue
@@ -588,46 +528,46 @@ class CsfmParser:
             f.seek(pos)
 
     def _parse_chart_scale(self, f):
-        btn_type_count = self.read_u64(f)
-        btn_types_offset = self.read_u64(f)
+        btn_type_count = self._read_u64(f)
+        btn_types_offset = self._read_u64(f)
 
-        self.chart["scale"]["ticks_per_beat"] = self.read_i32(f)
-        self.read_i32(f)  # padding
-        self.chart["scale"]["placement_area"] = (self.read_f32(f), self.read_f32(f))
+        self.chart["scale"]["ticks_per_beat"] = self._read_i32(f)
+        self._read_i32(f)  # padding
+        self.chart["scale"]["placement_area"] = (self._read_f32(f), self._read_f32(f))
 
-        rotation = self.read_f32(f)
+        rotation = self._read_f32(f)
         self.chart["scale"]["full_angle_rotation"] = 360.0 if rotation == 0.0 else rotation
 
-        self.read_u32(f)  # padding
-        for _ in range(3): self.read_u64(f)  # padding
+        self._read_u32(f)  # padding
+        for _ in range(3): self._read_u64(f)  # padding
 
         if btn_types_offset != 0:
             pos = f.tell()
             f.seek(btn_types_offset)
-            btn_names = [self.read_str_ptr(f) for _ in range(btn_type_count)]
+            btn_names = [self._read_str_ptr(f) for _ in range(btn_type_count)]
             self.chart["scale"]["button_type_names"] = btn_names
             f.seek(pos)
 
     def _parse_chart_time(self, f):
-        entry_count = self.read_u64(f)
-        entries_offset = self.read_u64(f)
-        self.read_u64(f)
-        self.read_u64(f)
+        entry_count = self._read_u64(f)
+        entries_offset = self._read_u64(f)
+        self._read_u64(f)
+        self._read_u64(f)
 
         if entries_offset != 0:
             f.seek(entries_offset)
             for _ in range(entry_count):
-                key = self.read_str_ptr(f)
-                val = self.read_f64(f)  # Timespan read as seconds
-                self.read_u64(f)
-                self.read_u64(f)
+                key = self._read_str_ptr(f)
+                val = self._read_f64(f)  # Timespan read as seconds
+                self._read_u64(f)
+                self._read_u64(f)
                 self.chart["time"][key] = val
 
     def _parse_chart_targets(self, f):
-        target_count = self.read_u64(f)
-        field_count = self.read_u64(f)
-        fields_offset = self.read_u64(f)
-        self.read_u64(f)
+        target_count = self._read_u64(f)
+        field_count = self._read_u64(f)
+        fields_offset = self._read_u64(f)
+        self._read_u64(f)
 
         # Initialize the targets array
         self.chart["targets"] = [{} for _ in range(target_count)]
@@ -637,12 +577,12 @@ class CsfmParser:
 
         f.seek(fields_offset)
         for _ in range(field_count):
-            name_id = self.read_str_ptr(f)
-            byte_size = self.read_u64(f)
-            array_size = self.read_u64(f)
-            field_offset = self.read_u64(f)
-            self.read_u64(f)
-            self.read_u64(f)
+            name_id = self._read_str_ptr(f)
+            byte_size = self._read_u64(f)
+            array_size = self._read_u64(f)
+            field_offset = self._read_u64(f)
+            self._read_u64(f)
+            self._read_u64(f)
 
             if field_offset != 0:
                 pos = f.tell()
@@ -652,23 +592,23 @@ class CsfmParser:
                 for i in range(target_count):
                     val = None
                     if name_id == "Tick":
-                        val = self.read_i32(f)
+                        val = self._read_i32(f)
                     elif name_id in ["Type", "Properties", "Hold", "Chain", "Chance"]:
-                        val = self.read_u8(f)
+                        val = self._read_u8(f)
                     elif name_id == "Position":
-                        val = (self.read_f32(f), self.read_f32(f))
+                        val = (self._read_f32(f), self._read_f32(f))
                     elif name_id in ["Angle", "Frequency", "Amplitude", "Distance"]:
-                        val = self.read_f32(f)
+                        val = self._read_f32(f)
 
                     if val is not None:
                         self.chart["targets"][i][name_id] = val
                 f.seek(pos)
 
     def _parse_chart_tempo_map(self, f):
-        tempo_count = self.read_u64(f)
-        field_count = self.read_u64(f)
-        fields_offset = self.read_u64(f)
-        self.read_u64(f)
+        tempo_count = self._read_u64(f)
+        field_count = self._read_u64(f)
+        fields_offset = self._read_u64(f)
+        self._read_u64(f)
 
         self.chart["tempo_map"] = [{} for _ in range(tempo_count)]
 
@@ -677,12 +617,12 @@ class CsfmParser:
 
         f.seek(fields_offset)
         for _ in range(field_count):
-            name_id = self.read_str_ptr(f)
-            byte_size = self.read_u64(f)
-            array_size = self.read_u64(f)
-            field_offset = self.read_u64(f)
-            self.read_u64(f)
-            self.read_u64(f)
+            name_id = self._read_str_ptr(f)
+            byte_size = self._read_u64(f)
+            array_size = self._read_u64(f)
+            field_offset = self._read_u64(f)
+            self._read_u64(f)
+            self._read_u64(f)
 
             if field_offset != 0:
                 pos = f.tell()
@@ -691,15 +631,15 @@ class CsfmParser:
                 for i in range(tempo_count):
                     val = None
                     if name_id == "Tick":
-                        val = self.read_i32(f)
+                        val = self._read_i32(f)
                     elif name_id == "Tempo":
-                        val = self.read_f32(f)
+                        val = self._read_f32(f)
                     elif name_id == "Flying Time Factor":
-                        val = self.read_f32(f)
+                        val = self._read_f32(f)
                     elif name_id == "Time Signature":
-                        val = (self.read_i16(f), self.read_i16(f))  # Numerator, Denominator
+                        val = (self._read_i16(f), self._read_i16(f))  # Numerator, Denominator
                     elif name_id == "Flags":
-                        flags = self.read_u32(f)
+                        flags = self._read_u32(f)
                         val = {
                             "has_tempo": bool(flags & 1),
                             "has_flying_time": bool((flags >> 1) & 1),
@@ -711,30 +651,131 @@ class CsfmParser:
                 f.seek(pos)
 
     def _parse_chart_button_sounds(self, f):
-        btn_count = self.read_u64(f)
-        btn_offset = self.read_u64(f)
-        self.read_u64(f)
-        self.read_u64(f)
+        btn_count = self._read_u64(f)
+        btn_offset = self._read_u64(f)
+        self._read_u64(f)
+        self._read_u64(f)
 
         if btn_offset != 0 and btn_count >= 4:
             f.seek(btn_offset)
             self.chart["button_sounds"] = {
-                "ButtonID": self.read_u32(f),
-                "SlideID": self.read_u32(f),
-                "ChainSlideID": self.read_u32(f),
-                "SliderTouchID": self.read_u32(f)
+                "ButtonID": self._read_u32(f),
+                "SlideID": self._read_u32(f),
+                "ChainSlideID": self._read_u32(f),
+                "SliderTouchID": self._read_u32(f)
             }
 
     def _parse_chart_difficulty(self, f):
         self.chart["difficulty"] = {
-            "Type": self.read_u8(f),
-            "Version": self.read_u8(f),
-            "LevelWhole": self.read_u8(f),
-            "LevelFraction": self.read_u8(f)
+            "Type": self._read_u8(f),
+            "Version": self._read_u8(f),
+            "LevelWhole": self._read_u8(f),
+            "LevelFraction": self._read_u8(f)
         }
-        self.read_u64(f)
-        self.read_u64(f)
+        self._read_u64(f)
+        self._read_u64(f)
 
+    def get_song_name(self):
+        try:
+            return self.metadata[MetadataProperties.SongTitle.value]
+        except KeyError:
+            return ""
+    def get_difficulty(self,output_format:DifficultyOutput=DifficultyOutput.Full):
+        type = self.chart[ChartProperties.Difficulty.value][DifficultyProperties.Type.value]
+        version = self.chart[ChartProperties.Difficulty.value][DifficultyProperties.Version.value]
+        whole = self.chart[ChartProperties.Difficulty.value][DifficultyProperties.LevelWhole.value]
+        fraction = self.chart[ChartProperties.Difficulty.value][DifficultyProperties.LevelFraction.value]
+
+        difficulty_string = ""
+        if not version == 0:
+            difficulty_string = "Extra "
+
+        match type:
+            case 0:
+                difficulty_string = difficulty_string + "Easy"
+            case 1:
+                difficulty_string = difficulty_string + "Normal"
+            case 2:
+                difficulty_string = difficulty_string + "Hard"
+            case 3:
+                difficulty_string = difficulty_string + "Extreme"
+
+        match output_format:
+            case DifficultyOutput.Full:
+                return f"{difficulty_string} {whole}.{fraction}"
+            case DifficultyOutput.Level:
+                return f"{difficulty_string}"
+            case DifficultyOutput.StarRating:
+                return f"{whole}.{fraction}"
+
+    def get_duration(self):
+        total_seconds = self.chart[ChartProperties.Time.value][ChartTimeProperties.Duration.value]
+
+        minutes = int(total_seconds // 60)
+        seconds = int(total_seconds % 60)
+        milliseconds = int((total_seconds * 1000) % 1000)
+
+        return f"{minutes:02d}:{seconds:02d}.{milliseconds:03d}"
+
+    def get_flying_time_at_tick(self,tick):
+        current_flying_time = 1
+        for tempo_map_entry in self.chart[ChartProperties.TempoMap.value]:
+            if tempo_map_entry[TempoMapProperties.Tick.value] <= tick:
+                current_flying_time = tempo_map_entry[TempoMapProperties.FlyingTimeFactor.value]
+            else:
+                break
+
+        return current_flying_time * 100
+
+    def get_time_from_tick(self,target_tick):
+        tempo_map = self.chart[ChartProperties.TempoMap.value]
+        ticks_per_beat = self.chart[ChartProperties.Scale.value][ScaleProperties.TicksPerBeat.value]
+
+        total_seconds = 0.0
+        last_tick = 0
+
+        current_bpm = 160.0
+        if tempo_map and 'Tempo' in tempo_map[0]:
+            current_bpm = tempo_map[0]['Tempo']
+
+        for tc in tempo_map:
+            tc_tick = tc.get('Tick', 0)
+
+            if tc_tick >= target_tick:
+                break
+
+            ticks_spent = tc_tick - last_tick
+            beats_spent = ticks_spent / ticks_per_beat
+            total_seconds += beats_spent * (60.0 / current_bpm)
+
+            last_tick = tc_tick
+            if tc.get('Flags', {}).get('has_tempo', True) and 'Tempo' in tc:
+                current_bpm = tc['Tempo']
+
+        remaining_ticks = target_tick - last_tick
+        remaining_beats = remaining_ticks / ticks_per_beat
+        total_seconds += remaining_beats * (60.0 / current_bpm)
+
+        minutes = int(total_seconds // 60)
+        seconds = int(total_seconds % 60)
+        milliseconds = int((total_seconds * 1000) % 1000)
+
+        return f"{minutes:02d}:{seconds:02d}.{milliseconds:03d}"
+
+    def get_target_section(self,tick, beats):
+        current_tick = tick
+        targets = self.chart[ChartProperties.Targets.value]
+        ticks_per_beat = self.chart[ChartProperties.Scale.value][ScaleProperties.TicksPerBeat.value]
+
+        ticks_in_window = beats * ticks_per_beat
+
+        lower_bound = current_tick - ticks_in_window
+
+        recent_targets = [
+            t for t in targets
+            if lower_bound <= t.get("Tick") < current_tick
+        ]
+        return recent_targets
 def scan_folder(folder):
     directory = os.fsencode(folder)
 
@@ -746,39 +787,40 @@ def scan_folder(folder):
 def scan_csfm(file):
     parser.parse(file)
 
-    print(parser.metadata[MetadataProperties.SongTitle.value])
-    print(get_time_from_duration(parser.chart[ChartProperties.Time.value][ChartTimeProperties.Duration.value]))
-    print(get_difficulty(parser.chart[ChartProperties.Difficulty.value]))
+    print(parser.get_song_name())
+    print(parser.get_duration())
+    print(parser.get_difficulty())
 
     for note in parser.chart[ChartProperties.Targets.value]:
         point = get_note_spawn_point(note)
 
         if check_if_point_in_visible_area(point):
-            #print(f'Before - {round_position(point)} last section positions {filter_target_properties(get_first_target_from_section(get_target_section(note[TargetProperties.Tick.value],2,parser)),TargetProperties.Position)}')
-
             if position_check_with_tolerance(round_position(point),
-                                             filter_target_properties(get_first_target_from_section(get_target_section(note[TargetProperties.Tick.value],
-                                                                                                                       convert_flying_time_to_amount_of_beats_for_fancy_note(
-                                                                                                                           get_flying_time_at_tick(note[TargetProperties.Tick.value] -1 ,parser)),parser)),TargetProperties.Position)):
-                print(f"At {get_time_from_tick(note[TargetProperties.Tick.value], parser)} Note spawns from other note. Exact spawn position {round_position(point)}")
+                                             filter_target_properties(get_first_target_from_section(parser.get_target_section(note[TargetProperties.Tick.value],
+                                                                                                                              flying_time_to_beats(
+                                                                                                                           parser.get_flying_time_at_tick(note[TargetProperties.Tick.value] -1)))),TargetProperties.Position)):
+                print(f"At {parser.get_time_from_tick(note[TargetProperties.Tick.value])} Note spawns from other note. Exact spawn position {round_position(point)}")
 
 
             elif note[TargetProperties.Distance.value] == 0:
-                print(f"At {get_time_from_tick(note[TargetProperties.Tick.value], parser)} Phantom Note.")
+                print(f"At {parser.get_time_from_tick(note[TargetProperties.Tick.value])} Phantom Note.")
             else:
-                print(f"At {get_time_from_tick(note[TargetProperties.Tick.value], parser)} Note spawns on screen. Exact spawn position {round_position(point)}. Distance {note[TargetProperties.Distance.value]}")
+                print(f"At {parser.get_time_from_tick(note[TargetProperties.Tick.value])} Note spawns on screen. Exact spawn position {round_position(point)}. Distance {note[TargetProperties.Distance.value]}")
 
 
 
 if __name__ == "__main__":
     parser = CsfmParser()
-    #parser.parse("/home/jitterglitch/PycharmProjects/CSFM-Helper/Test Data/Tempo Map info test.csfm")
+    parser.parse("/home/jitterglitch/PycharmProjects/CSFM-Helper/Test Data/Properties.csfm")
 
     #scan_folder("/home/jitterglitch/PycharmProjects/CSFM-Helper/Test Data/Kinema106 Song Pack")
     #scan_csfm("/home/jitterglitch/PycharmProjects/CSFM-Helper/Test Data/Zaako/Zako EXEX.csfm")
 
     #scan_csfm("/home/jitterglitch/PycharmProjects/CSFM-Helper/Test Data/Kinema106 Song Pack/Suiso 9.5 EXEX.csfm")
-    scan_csfm("/home/jitterglitch/PycharmProjects/CSFM-Helper/Test Data/JitterGlitch Chart Pack/FOMENT - 7 HD.csfm")
+    #scan_csfm("/home/jitterglitch/PycharmProjects/CSFM-Helper/Test Data/JitterGlitch Chart Pack/FOMENT - 7 HD.csfm")
+    #scan_csfm("/home/jitterglitch/PycharmProjects/CSFM-Helper/Test Data/Note Spawn check.csfm")
+
+    print(parser.metadata)
 
 
 
