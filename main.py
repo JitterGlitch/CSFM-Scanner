@@ -143,6 +143,7 @@ class DifficultyOutput(Enum):
 class NoteCheck(Enum):
     SpawnOnScreen = auto()
     SpawnFromNote = auto()
+    SpawnFromNoteType = auto()
     PhantomNote = auto()
 
 def get_target_type_enum(target):
@@ -786,12 +787,29 @@ class CsfmParser:
             case NoteCheck.SpawnOnScreen:
                 return check_if_point_in_visible_area(point)
             case NoteCheck.SpawnFromNote:
-                return position_check_with_tolerance(round_position(point),
-                                                 filter_target_properties(
-                                                     get_first_target_from_section(
-                                                         self.get_target_section(note[TargetProperties.Tick.value],
-                                                                                 flying_time_to_beats(
-                                                                                     self.get_flying_time_at_tick(note[TargetProperties.Tick.value] - 1)))), TargetProperties.Position))
+
+
+                timestamp =  self.get_flying_time_at_tick(note[TargetProperties.Tick.value] - 1)
+                section = self.get_target_section(note[TargetProperties.Tick.value],flying_time_to_beats(timestamp))
+                section_positions = filter_target_properties(get_first_target_from_section(section), TargetProperties.Position)
+
+
+                return position_check_with_tolerance(round_position(point),section_positions)
+
+            case NoteCheck.SpawnFromNoteType:
+
+                timestamp = self.get_flying_time_at_tick(note[TargetProperties.Tick.value] - 1)
+                section = self.get_target_section(note[TargetProperties.Tick.value],flying_time_to_beats(timestamp))
+                section_positions = filter_target_properties(get_first_target_from_section(section), TargetProperties.Position)
+                target_type = -1
+
+                for target in get_first_target_from_section(section):
+                    if position_check_with_tolerance(point,section_positions,5):
+                        target_type = target[TargetProperties.Type.value]
+                        break
+
+                return note[TargetProperties.Type.value] == target_type
+
             case NoteCheck.PhantomNote:
                     return note[TargetProperties.Distance.value] == 0
 
@@ -807,7 +825,11 @@ class CsfmParser:
 
             if self.note_check(NoteCheck.SpawnOnScreen, note):
                 if self.note_check(NoteCheck.SpawnFromNote, note):
-                    print(f"At {parser.get_time_from_tick(note[TargetProperties.Tick.value])} Note spawns from other note. Exact spawn position {round_position(point)}")
+                    if self.note_check(NoteCheck.SpawnFromNoteType,note):
+                        print(f"At {parser.get_time_from_tick(note[TargetProperties.Tick.value])} Note spawns from other note of same type. Exact spawn position {round_position(point)}")
+                    else:
+                        print(f"At {parser.get_time_from_tick(note[TargetProperties.Tick.value])} Note spawns from other note of different type. Exact spawn position {round_position(point)}")
+
 
 
                 elif self.note_check(NoteCheck.PhantomNote, note):
@@ -826,7 +848,8 @@ class CsfmParser:
 if __name__ == "__main__":
     parser = CsfmParser()
 
-    parser.scan_csfm("/home/jitterglitch/PycharmProjects/CSFM-Helper/Test Data/Kinema106 Song Pack/Suiso 9.5 EXEX.csfm")
+    #parser.scan_csfm("/home/jitterglitch/PycharmProjects/CSFM-Helper/Test Data/Kinema106 Song Pack/Suiso 9.5 EXEX.csfm")
+    parser.scan_csfm("/home/jitterglitch/PycharmProjects/CSFM-Helper/Test Data/JitterGlitch Chart Pack/FOMENT - 7 HD.csfm")
 
 
 
