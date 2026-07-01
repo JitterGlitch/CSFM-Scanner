@@ -8,11 +8,14 @@ from PySide6.QtWidgets import (QAbstractScrollArea, QComboBox,
                                QScrollArea, QSizePolicy, QSpacerItem, QStackedWidget,
                                QTabWidget, QVBoxLayout, QWidget, QMenuBar, QListWidget, QStatusBar, QListWidgetItem)
 
+from main import NoteCheck
+
+
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         if not MainWindow.objectName():
             MainWindow.setObjectName(u"MainWindow")
-        MainWindow.resize(800, 600)
+        MainWindow.resize(1200, 600)
         MainWindow.setWindowTitle("CSFM Scanner")
         self.centralwidget = QWidget(MainWindow)
         self.centralwidget.setObjectName(u"centralwidget")
@@ -43,7 +46,7 @@ class Ui_MainWindow(object):
 
 
         self.side_config_frame = QFrame()
-        self.side_config_frame.setMaximumWidth(200)
+        self.side_config_frame.setMaximumWidth(300)
         self.side_config_layout = QVBoxLayout(self.side_config_frame)
 
         self.target_spawn_precision_label = QLabel("Target Spawn Precision")
@@ -51,15 +54,21 @@ class Ui_MainWindow(object):
         self.target_spawn_precision_combobox.addItem("Normal")
         self.target_spawn_precision_combobox.addItem("Strict")
 
+        self.filter_check_label = QLabel()
+        self.filter_check_label.setText("Check for...")
         self.filter_check_listview = QListWidget()
-        for i in range(20):
-            item = QListWidgetItem(f"Option {i + 1}")
+        for check in NoteCheck:
+            item = QListWidgetItem(check.value)
             item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
-            item.setCheckState(Qt.CheckState.Unchecked)
+            if check.value.startswith("(WIP)"):
+                item.setCheckState(Qt.CheckState.Unchecked)
+            else:
+                item.setCheckState(Qt.CheckState.Checked)
             self.filter_check_listview.addItem(item)
 
         self.side_config_layout.addWidget(self.target_spawn_precision_label)
         self.side_config_layout.addWidget(self.target_spawn_precision_combobox)
+        self.side_config_layout.addWidget(self.filter_check_label)
         self.side_config_layout.addWidget(self.filter_check_listview)
 
 

@@ -141,10 +141,46 @@ class DifficultyOutput(Enum):
     Level = auto()
 
 class NoteCheck(Enum):
-    SpawnOnScreen = auto()
-    SpawnFromNote = auto()
-    SpawnFromNoteType = auto()
-    PhantomNote = auto()
+    SpawnOnScreen = "Notes spawning on screen"
+    SpawnFromNote = "Notes spawning from other notes"
+    SpawnFromNoteType = "Notes spawning same type"
+    PhantomNote = "Notes with 0 Distance"
+
+    #Doable without much trouble
+    HMultiColumns = "(WIP) Horizontal multi note placements"
+    VMultiOrder = "(WIP) Vertical Multi-Note order"
+    NotesOutsideGrid = "(WIP) Notes placed outside of grid"
+    Multi880Distance = "(WIP) 880 Distance Multi-Notes"
+    HighAmplitude = "(WIP) Too high Amplitude"
+    HighDistance = "(WIP) Too high Distance"
+    CrashingMultis = "(WIP) Multi-Notes that cause game crash"
+    NotesInGrayArea = "(WIP) Notes placed within 1st measure"
+    AbnormalBPMChanges = "(WIP) BPM Changes faster than a measure"
+
+    #Possible but will take time
+    ChainslideStraight = "(WIP) Chainslide placement"
+    FlyingTime50Chainslide = "(WIP) 50% flying time during Chainslide"
+    HoldsDuringChainslides = "(WIP) Holds during chainsliders"
+    SpamDuringHold= "(WIP) Spam during Holds"
+
+    #IDK
+    MemeGridUsed = "(WIP) 1/192 Grid being used"
+    HumanLimits = "(WIP) Spams too fast to play"
+    FrequencyMatchDirection = "(WIP) Frequency matching pattern direction"
+    AngleIncrement = "(WIP) Notes without angle increments"
+    NonStandardTriple = "(WIP) Non-Standard Horiz. Multi-Notes"
+    HardDiffHolds = "(WIP) Hard difficulty Hold Rules"
+    EndHoldInterrupt = "(WIP) Song ending before last hold maxing out"
+    SpamsOnHDorLower = "(WIP) Spams on Hard or lower"
+    BadOverlaps = "(WIP) Notes overlaping other types"
+    ShortPathOnScreen = "(WIP) Not enough of path on screen"
+
+    #Hard if not impossible
+    Spacing = "(WIP) Note spacing"
+    AcOrder = "(WIP) Arcade Order"
+
+
+
 
 def get_target_type_enum(target):
     btn_type = target.get("Type", 3)
