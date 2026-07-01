@@ -800,13 +800,13 @@ class CsfmParser:
 
                 timestamp = self.get_flying_time_at_tick(note[TargetProperties.Tick.value] - 1)
                 section = self.get_target_section(note[TargetProperties.Tick.value],flying_time_to_beats(timestamp))
-                section_positions = filter_target_properties(get_first_target_from_section(section), TargetProperties.Position)
                 target_type = -1
 
+
                 for target in get_first_target_from_section(section):
-                    if position_check_with_tolerance(point,section_positions,5):
+                    target_position = round_position(target[TargetProperties.Position.value])
+                    if position_check_with_tolerance(target_position,[round_position(point)]):
                         target_type = target[TargetProperties.Type.value]
-                        break
 
                 return note[TargetProperties.Type.value] == target_type
 
@@ -820,23 +820,26 @@ class CsfmParser:
         print(self.get_duration())
         print(self.get_difficulty())
         print("")
+
+        issues_list = []
         for note in self.chart[ChartProperties.Targets.value]:
             point = get_note_spawn_point(note)
 
             if self.note_check(NoteCheck.SpawnOnScreen, note):
                 if self.note_check(NoteCheck.SpawnFromNote, note):
                     if self.note_check(NoteCheck.SpawnFromNoteType,note):
-                        print(f"At {parser.get_time_from_tick(note[TargetProperties.Tick.value])} Note spawns from other note of same type. Exact spawn position {round_position(point)}")
+                        issues_list.append(("Info",f"At {self.get_time_from_tick(note[TargetProperties.Tick.value])} Note spawns from other note of same type. Exact spawn position {round_position(point)}"))
                     else:
-                        print(f"At {parser.get_time_from_tick(note[TargetProperties.Tick.value])} Note spawns from other note of different type. Exact spawn position {round_position(point)}")
+                        issues_list.append(("Error",f"At {self.get_time_from_tick(note[TargetProperties.Tick.value])} Note spawns from other note of different type. Exact spawn position {round_position(point)}"))
 
 
 
                 elif self.note_check(NoteCheck.PhantomNote, note):
-                    print(f"At {self.get_time_from_tick(note[TargetProperties.Tick.value])} Phantom Note.")
+                    issues_list.append(("Info",f"At {self.get_time_from_tick(note[TargetProperties.Tick.value])} Phantom Note."))
                 else:
-                    print(f"At {self.get_time_from_tick(note[TargetProperties.Tick.value])} Note spawns on screen. Exact spawn position {round_position(point)}. Distance {note[TargetProperties.Distance.value]}")
-        print("")
+                    issues_list.append(("Error",f"At {self.get_time_from_tick(note[TargetProperties.Tick.value])} Note spawns on screen. Exact spawn position {round_position(point)}. Distance {note[TargetProperties.Distance.value]}"))
+
+        return issues_list
     def scan_folder(self,folder):
         directory = os.fsencode(folder)
 
@@ -850,6 +853,7 @@ if __name__ == "__main__":
 
     #parser.scan_csfm("/home/jitterglitch/PycharmProjects/CSFM-Helper/Test Data/Kinema106 Song Pack/Suiso 9.5 EXEX.csfm")
     parser.scan_csfm("/home/jitterglitch/PycharmProjects/CSFM-Helper/Test Data/JitterGlitch Chart Pack/FOMENT - 7 HD.csfm")
+
 
 
 
