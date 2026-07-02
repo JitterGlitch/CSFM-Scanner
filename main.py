@@ -139,6 +139,14 @@ class DifficultyOutput(Enum):
     Full = auto()
     StarRating = auto()
     Level = auto()
+class TempoMapOutput(Enum):
+    Full = auto()
+    BPM = auto()
+    PerceivedBPM = auto()
+    BPMExtremes = auto()
+    PerceivedBPMExtremes = auto()
+    FlyingTime = auto()
+    FlyingTimeExtremes = auto()
 
 class NoteCheck(Enum):
     SpawnOnScreen = "Notes spawning on screen"
@@ -758,6 +766,110 @@ class CsfmParser:
         milliseconds = int((total_seconds * 1000) % 1000)
 
         return f"{minutes:02d}:{seconds:02d}.{milliseconds:03d}"
+    def get_tempo_map_string(self,output_type:TempoMapOutput=TempoMapOutput.Full):
+        tempo_list = []
+        output_string = ""
+
+        for entry in self.chart[ChartProperties.TempoMap.value]:
+            tempo_list.append((entry[TempoMapProperties.Tempo.value],(round(entry[TempoMapProperties.FlyingTimeFactor.value] * 100))))
+
+        match output_type:
+            case TempoMapOutput.Full:
+                for entry in tempo_list:
+                    if output_string:
+                        output_string = output_string + " -> " + f"{entry[0]} ({entry[1]}%)"
+                    else:
+                        output_string = f"{entry[0]} ({entry[1]}%)"
+
+            case TempoMapOutput.BPM:
+                previous_bpm = 0.0
+                for entry in tempo_list:
+                    if entry[0] != previous_bpm:
+                        if output_string:
+                            output_string = output_string + " -> " + f"{entry[0]}"
+                        else:
+                            output_string = f"{entry[0]}"
+
+                        previous_bpm = entry[0]
+                    else:
+                        continue
+
+            case TempoMapOutput.PerceivedBPM:
+                previous_bpm = 0.0
+                for entry in tempo_list:
+                    if entry[0]*(entry[1]/100) != previous_bpm:
+                        if output_string:
+                            output_string = output_string + " -> " + f"{entry[0]*(entry[1]/100)}"
+                        else:
+                            output_string = f"{entry[0]*(entry[1]/100)}"
+
+                        previous_bpm = entry[0]*(entry[1]/100)
+                    else:
+                        continue
+
+            case TempoMapOutput.BPMExtremes:
+                lowest_bpm_seen = 9999999
+                highest_bpm_seen = 0
+
+                for entry in tempo_list:
+                    if entry[0] > highest_bpm_seen:
+                        highest_bpm_seen = entry[0]
+                    if entry[0] < lowest_bpm_seen:
+                        lowest_bpm_seen = entry[0]
+
+                if lowest_bpm_seen == highest_bpm_seen:
+                    output_string = f"{lowest_bpm_seen}"
+                else:
+                    output_string = f"({lowest_bpm_seen} - {highest_bpm_seen})"
+
+            case TempoMapOutput.PerceivedBPMExtremes:
+                lowest_bpm_seen = 9999999
+                highest_bpm_seen = 0
+
+                for entry in tempo_list:
+                    if entry[0]*(entry[1]/100) > highest_bpm_seen:
+                        highest_bpm_seen = entry[0]*(entry[1]/100)
+                    if entry[0]*(entry[1]/100) < lowest_bpm_seen:
+                        lowest_bpm_seen = entry[0]*(entry[1]/100)
+
+                if lowest_bpm_seen == highest_bpm_seen:
+                    output_string = f"{lowest_bpm_seen}"
+                else:
+                    output_string = f"({lowest_bpm_seen} - {highest_bpm_seen})"
+
+
+            case TempoMapOutput.FlyingTime:
+                previous_flying_time = 0.0
+                for entry in tempo_list:
+                    if entry[1] != previous_flying_time:
+                        if output_string:
+                            output_string = output_string + " -> " + f"{entry[1]}%"
+                        else:
+                            output_string = f"{entry[1]}%"
+
+                        previous_flying_time = entry[1]
+                    else:
+                        continue
+
+            case TempoMapOutput.FlyingTimeExtremes:
+                lowest_flying_time_seen = 9999999
+                highest_flying_time_seen = 0
+
+                for entry in tempo_list:
+                    if entry[1] > highest_flying_time_seen:
+                        highest_flying_time_seen = entry[1]
+                    if entry[1] < lowest_flying_time_seen:
+                        lowest_flying_time_seen = entry[1]
+
+                if lowest_flying_time_seen == highest_flying_time_seen:
+                    output_string = f"{lowest_flying_time_seen}%"
+                else:
+                    output_string = f"({lowest_flying_time_seen}% - {highest_flying_time_seen}%)"
+
+
+
+        return output_string
+
 
     def get_flying_time_at_tick(self,tick):
         current_flying_time = 1
@@ -888,7 +1000,16 @@ if __name__ == "__main__":
     parser = CsfmParser()
 
     #parser.scan_csfm("/home/jitterglitch/PycharmProjects/CSFM-Helper/Test Data/Kinema106 Song Pack/Suiso 9.5 EXEX.csfm")
-    parser.scan_csfm("/home/jitterglitch/PycharmProjects/CSFM-Helper/Test Data/JitterGlitch Chart Pack/FOMENT - 7 HD.csfm")
+    #parser.scan_csfm("/home/jitterglitch/PycharmProjects/CSFM-Helper/Test Data/JitterGlitch Chart Pack/FOMENT - 7 HD.csfm")
+    parser.parse("/home/jitterglitch/PycharmProjects/CSFM-Helper/Test Data/JitterGlitch Chart Pack/FOMENT - 7 HD.csfm")
+
+    print(f"BPM and Flying Time: {parser.get_tempo_map_string()}")
+    print(f"BPM: {parser.get_tempo_map_string(TempoMapOutput.BPM)}")
+    print(f"Flying Time: {parser.get_tempo_map_string(TempoMapOutput.FlyingTime)}")
+    print(f"BPM Extremes: {parser.get_tempo_map_string(TempoMapOutput.BPMExtremes)}")
+    print(f"Flying Time Extremes: {parser.get_tempo_map_string(TempoMapOutput.FlyingTimeExtremes)}")
+    print(f"Perceived BPM: {parser.get_tempo_map_string(TempoMapOutput.PerceivedBPM)}")
+    print(f"Perceived BPM Extremes: {parser.get_tempo_map_string(TempoMapOutput.PerceivedBPMExtremes)}")
 
 
 
