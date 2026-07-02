@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (QAbstractScrollArea, QComboBox,
                                QScrollArea, QSizePolicy, QSpacerItem, QStackedWidget,
                                QTabWidget, QVBoxLayout, QWidget, QMenuBar, QListWidget, QStatusBar, QListWidgetItem)
 
-from main import NoteCheck
+from CSFM_Parser import NoteCheck
 
 
 class Ui_MainWindow(object):

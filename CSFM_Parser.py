@@ -996,22 +996,6 @@ class CsfmParser:
             if filename.endswith(".csfm"):
                 self.scan_csfm(str(folder)+ "/" + str(filename))
 
-if __name__ == "__main__":
-    parser = CsfmParser()
-
-    #parser.scan_csfm("/home/jitterglitch/PycharmProjects/CSFM-Helper/Test Data/Kinema106 Song Pack/Suiso 9.5 EXEX.csfm")
-    #parser.scan_csfm("/home/jitterglitch/PycharmProjects/CSFM-Helper/Test Data/JitterGlitch Chart Pack/FOMENT - 7 HD.csfm")
-    parser.parse("/home/jitterglitch/PycharmProjects/CSFM-Helper/Test Data/JitterGlitch Chart Pack/FOMENT - 7 HD.csfm")
-
-    print(f"BPM and Flying Time: {parser.get_tempo_map_string()}")
-    print(f"BPM: {parser.get_tempo_map_string(TempoMapOutput.BPM)}")
-    print(f"Flying Time: {parser.get_tempo_map_string(TempoMapOutput.FlyingTime)}")
-    print(f"BPM Extremes: {parser.get_tempo_map_string(TempoMapOutput.BPMExtremes)}")
-    print(f"Flying Time Extremes: {parser.get_tempo_map_string(TempoMapOutput.FlyingTimeExtremes)}")
-    print(f"Perceived BPM: {parser.get_tempo_map_string(TempoMapOutput.PerceivedBPM)}")
-    print(f"Perceived BPM Extremes: {parser.get_tempo_map_string(TempoMapOutput.PerceivedBPMExtremes)}")
-
-
 
 
 

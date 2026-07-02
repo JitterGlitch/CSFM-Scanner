@@ -6,7 +6,7 @@ from PySide6.QtGui import QColor
 from ui_main_window import Ui_MainWindow
 from PySide6.QtCore import Qt, QThread, Signal, QTimer, QFileSystemWatcher
 from PySide6.QtWidgets import QMainWindow, QApplication, QVBoxLayout, QPushButton, QListView, QWidget, QFileDialog, QListWidgetItem
-from main import CsfmParser, DifficultyOutput
+from CSFM_Parser import CsfmParser, DifficultyOutput
 
 
 class MainWindow(QMainWindow):
