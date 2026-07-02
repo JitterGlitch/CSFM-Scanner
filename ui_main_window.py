@@ -58,13 +58,12 @@ class Ui_MainWindow(object):
         self.filter_check_label.setText("Check for...")
         self.filter_check_listview = QListWidget()
         for check in NoteCheck:
-            item = QListWidgetItem(check.value)
-            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
-            if check.value.startswith("(WIP)"):
-                item.setCheckState(Qt.CheckState.Unchecked)
-            else:
+            if not check.value.startswith("(WIP)"):
+                item = QListWidgetItem(check.value)
+                item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+
                 item.setCheckState(Qt.CheckState.Checked)
-            self.filter_check_listview.addItem(item)
+                self.filter_check_listview.addItem(item)
 
         self.side_config_layout.addWidget(self.target_spawn_precision_label)
         self.side_config_layout.addWidget(self.target_spawn_precision_combobox)
