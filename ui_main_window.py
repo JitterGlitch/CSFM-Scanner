@@ -12,7 +12,7 @@ from CSFM_Parser import NoteCheck
 
 
 class Ui_MainWindow(object):
-    def setupUi(self, MainWindow):
+    def setupUi(self, MainWindow,filter_dict:dict):
         if not MainWindow.objectName():
             MainWindow.setObjectName(u"MainWindow")
         MainWindow.resize(1200, 600)
@@ -46,7 +46,7 @@ class Ui_MainWindow(object):
 
 
         self.side_config_frame = QFrame()
-        self.side_config_frame.setMaximumWidth(300)
+        self.side_config_frame.setMaximumWidth(400)
         self.side_config_layout = QVBoxLayout(self.side_config_frame)
 
         self.target_spawn_precision_label = QLabel("Target Spawn Precision")
@@ -56,19 +56,55 @@ class Ui_MainWindow(object):
 
         self.filter_check_label = QLabel()
         self.filter_check_label.setText("Check for...")
-        self.filter_check_listview = QListWidget()
-        for check in NoteCheck:
-            if not check.value.startswith("(WIP)"):
-                item = QListWidgetItem(check.value)
-                item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
 
-                item.setCheckState(Qt.CheckState.Checked)
-                self.filter_check_listview.addItem(item)
+        self.filter_scrollarea = QScrollArea()
+        self.filter_scrollarea.setMinimumWidth(350)
+        self.filter_scrollarea.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+
+        self.filter_scrollarea_contents = QWidget()
+        self.filter_scrollarea_contents_layout = QVBoxLayout()
+        self.filter_scrollarea_contents.setLayout(self.filter_scrollarea_contents_layout)
+
+
+        for check in NoteCheck:
+            if not check.value[0].startswith("(WIP)"):
+                check_group_label = QLabel(check.value[0])
+
+                font = check_group_label.font()
+                font.setBold(True)
+                check_group_label.setFont(font)
+
+                group_listview = QListWidget()
+                group_listview.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+                group_listview.itemChanged.connect(lambda sub_issue_item,issue=check.value[0] : self.update_dict(filter_dict,issue,sub_issue_item))
+
+                for sub_issue in check.value[1]:
+                    item = QListWidgetItem(sub_issue)
+                    item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+
+                    item.setCheckState(Qt.CheckState.Checked)
+                    dict_key = check.value[0] + "(" + sub_issue +")"
+                    filter_dict[dict_key] = item.checkState()
+                    group_listview.addItem(item)
+
+
+                row_height = group_listview.sizeHintForRow(0)
+                total_height = row_height * group_listview.count() + 2
+                group_listview.setMaximumHeight(total_height)
+                group_listview.setMinimumWidth(400)
+
+
+
+                self.filter_scrollarea_contents_layout.addWidget(check_group_label)
+                self.filter_scrollarea_contents_layout.addWidget(group_listview)
+        print(f"Filter dict: {filter_dict}")
+        self.filter_scrollarea.setWidget(self.filter_scrollarea_contents)
 
         self.side_config_layout.addWidget(self.target_spawn_precision_label)
         self.side_config_layout.addWidget(self.target_spawn_precision_combobox)
         self.side_config_layout.addWidget(self.filter_check_label)
-        self.side_config_layout.addWidget(self.filter_check_listview)
+        self.side_config_layout.addWidget(self.filter_scrollarea)
+
 
 
 
@@ -81,7 +117,7 @@ class Ui_MainWindow(object):
         self.button.setText("Load CSFM")
 
         self.csfm_issues_listview = QListWidget()
-
+        self.csfm_issues_listview.setMinimumWidth(600)
 
         self.layout.addWidget(self.button)
         self.layout.addLayout(self.info_layout)
@@ -90,3 +126,9 @@ class Ui_MainWindow(object):
         self.main_hbox_layout = QHBoxLayout(self.centralwidget)
         self.main_hbox_layout.addLayout(self.layout)
         self.main_hbox_layout.addWidget(self.side_config_frame)
+
+    def update_dict(self,filter_dict,item,sub_issue_item):
+        sub_issue=  sub_issue_item.text()
+        dict_key = item + "(" + sub_issue + ")"
+
+        filter_dict[dict_key] = sub_issue_item.checkState()

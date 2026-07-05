@@ -13,7 +13,9 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super(MainWindow, self).__init__()
         self.main_box = Ui_MainWindow()
-        self.main_box.setupUi(self)
+        self.filter_dict = {}
+        self.issues = ()
+        self.main_box.setupUi(self,self.filter_dict)
         self.main_box.button.pressed.connect(self.load_csfm)
         self.parser = CsfmParser()
         self.watcher = QFileSystemWatcher()
@@ -32,28 +34,33 @@ class MainWindow(QMainWindow):
                                                          f"Open CSFM",
                                                          None,
                                                          "*.csfm")
-            self.watcher.addPath(str(csfm_location[0]))
+
             if csfm_location == "":
                 print("User didn't select image")
                 return
 
+            self.watcher.addPath(str(csfm_location[0]))
+
+
 
         self.main_box.csfm_issues_listview.clear()
 
-        issues = self.parser.scan_csfm(csfm_location[0])
+        self.issues = self.parser.scan_csfm(csfm_location[0])
 
         self.main_box.csfm_file_label.setText(Path(csfm_location[0]).name)
         self.main_box.csfm_song_name_label.setText(self.parser.get_song_name())
         self.main_box.csfm_difficulty_label.setText(self.parser.get_difficulty())
 
-        for issue in issues:
+
+
+    def display_issues(self):
+
+        for issue in self.issues:
             issue_obj = QListWidgetItem(issue[1],self.main_box.csfm_issues_listview)
             if issue[0] == "Error":
                 issue_obj.setBackground(QColor(32+150,32+110,36+110,50))
-        if not issues:
+        if not self.issues:
             issue_obj = QListWidgetItem("No issues detected",self.main_box.csfm_issues_listview)
-
-
 
 
 
