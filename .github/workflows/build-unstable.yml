@@ -1,0 +1,65 @@
+name: Build CSFM-Scanner
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            artifact_name: CSFM-Scanner-Windows
+            path: dist/CSFM-Scanner
+            icon: ./Source/Images/Icon.ico
+          - os: ubuntu-latest
+            artifact_name: CSFM-Scanner-Linux
+            path: dist/CSFM-Scanner
+            icon: /Source/Images/Icon.ico
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+
+      - name: Install build tools & requirements
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller
+          pip install -r ./requirements.txt
+        shell: bash
+
+
+      - name: Build with PyInstaller
+        run: |
+          pyinstaller --onedir --icon=${{ matrix.icon }} -w --name CSFM-Scanner ./gui.py
+
+      - name: Create tarball for Linux
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          tar -cJf CSFM-Scanner-Linux.tar.xz -C dist CSFM-Scanner
+
+      - name: Upload Finished Build
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: 'CSFM-Scanner-Linux.tar.xz'
+          archive: false
+          if-no-files-found: error
+
+      - name: Upload Finished Build
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.path }}
+          if-no-files-found: error
