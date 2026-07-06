@@ -1030,8 +1030,8 @@ class CsfmParser:
         return recent_targets
 
 
-    def scan_csfm(self,file):
-        note_spawn_precision = TargetSpawnPrecision.Normal
+    def scan_csfm(self,file,precision:TargetSpawnPrecision):
+        note_spawn_precision = precision
         self.parse(file)
 
         print(self.get_song_name())

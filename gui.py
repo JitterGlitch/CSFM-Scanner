@@ -56,6 +56,7 @@ class MainWindow(QMainWindow):
         self.issues = ()
         self.main_box.setupUi(self,self.filter_dict)
         self.main_box.button.pressed.connect(self.load_csfm)
+        self.main_box.target_spawn_precision_combobox.currentEnumChanged.connect(self.target_precision_changed)
         for group_list in self.main_box.group_lists:
             group_list.itemChanged.connect(self.display_issues)
         self.parser = CsfmParser()
@@ -69,6 +70,10 @@ class MainWindow(QMainWindow):
 
         self.watcher.addPath(str(path))
         self.load_csfm([path,'*.csfm'])
+    def target_precision_changed(self):
+        print(self.parser.metadata)
+        if self.parser.metadata != {}:
+            self.load_csfm(self.watcher.files())
     def load_csfm(self,csfm_location:str=None):
         if csfm_location is None:
             csfm_location = QFileDialog.getOpenFileName(self,
@@ -86,7 +91,7 @@ class MainWindow(QMainWindow):
 
         self.main_box.csfm_issues_listview.clear()
 
-        self.issues = self.parser.scan_csfm(csfm_location[0])
+        self.issues = self.parser.scan_csfm(csfm_location[0],self.main_box.target_spawn_precision_combobox.currentEnum())
 
         self.main_box.csfm_file_label.setText(Path(csfm_location[0]).name)
         self.main_box.csfm_song_name_label.setText(self.parser.get_song_name())

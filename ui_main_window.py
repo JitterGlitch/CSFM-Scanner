@@ -7,8 +7,9 @@ from PySide6.QtWidgets import (QAbstractScrollArea, QComboBox,
                                QLabel, QLayout, QPushButton,
                                QScrollArea, QSizePolicy, QSpacerItem, QStackedWidget,
                                QTabWidget, QVBoxLayout, QWidget, QMenuBar, QListWidget, QStatusBar, QListWidgetItem)
+from superqt import QEnumComboBox
 
-from CSFM_Parser import NoteCheck
+from CSFM_Parser import NoteCheck, TargetSpawnPrecision
 
 
 class Ui_MainWindow(object):
@@ -50,9 +51,7 @@ class Ui_MainWindow(object):
         self.side_config_layout = QVBoxLayout(self.side_config_frame)
 
         self.target_spawn_precision_label = QLabel("Target Spawn Precision")
-        self.target_spawn_precision_combobox = QComboBox()
-        self.target_spawn_precision_combobox.addItem("Normal")
-        self.target_spawn_precision_combobox.addItem("Strict")
+        self.target_spawn_precision_combobox = QEnumComboBox(enum_class=TargetSpawnPrecision)
 
         self.filter_check_label = QLabel()
         self.filter_check_label.setText("Check for...")
