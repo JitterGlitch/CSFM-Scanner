@@ -15,11 +15,9 @@ jobs:
           - os: windows-latest
             artifact_name: CSFM-Scanner-Windows
             path: dist/CSFM-Scanner
-            icon: ./Source/Images/Icon.ico
           - os: ubuntu-latest
             artifact_name: CSFM-Scanner-Linux
             path: dist/CSFM-Scanner
-            icon: /Source/Images/Icon.ico
 
     steps:
       - name: Checkout repository
@@ -40,7 +38,7 @@ jobs:
 
       - name: Build with PyInstaller
         run: |
-          pyinstaller --onedir --icon=${{ matrix.icon }} -w --name CSFM-Scanner ./gui.py
+          pyinstaller --onedir -w --name CSFM-Scanner ./gui.py
 
       - name: Create tarball for Linux
         if: matrix.os == 'ubuntu-latest'
