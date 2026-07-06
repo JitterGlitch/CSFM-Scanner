@@ -1,4 +1,5 @@
 import sys
+from enum import Enum, auto
 from pathlib import Path
 
 from PySide6.QtGui import QColor
@@ -6,10 +7,48 @@ from PySide6.QtGui import QColor
 from ui_main_window import Ui_MainWindow
 from PySide6.QtCore import Qt, QThread, Signal, QTimer, QFileSystemWatcher
 from PySide6.QtWidgets import QMainWindow, QApplication, QVBoxLayout, QPushButton, QListView, QWidget, QFileDialog, QListWidgetItem
-from CSFM_Parser import CsfmParser, DifficultyOutput
+from CSFM_Parser import CsfmParser, DifficultyOutput, NoteCheck, ChartIssue, TargetProperties, IssueLevel
+
+class TargetName(Enum):
+    Triangle = auto()
+    Square = auto()
+    Cross = auto()
+    Circle = auto()
+
+def get_note_name(note_type):
+    match note_type:
+        case 0:
+            return "Triangle"
+        case 1:
+            return "Square"
+        case 2:
+            return "Cross"
+        case 3:
+            return "Circle"
+def get_issue_description(issue:ChartIssue):
+    timestamp = issue.parser.get_time_from_tick(issue.note[TargetProperties.Tick.value])
+    issue_level = issue.level.name
+    note_type = get_note_name(issue.note[TargetProperties.Type.value])
+
+    spawn_position = issue.extra_info["Note Spawn Position"]
+
+
+    match issue.type:
+        case NoteCheck.NOTE_SPAWN_ON_SCREEN:
+            return f"{issue_level} - At {timestamp} {note_type} spawns on screen. Exact spawn position {spawn_position}"
+        case NoteCheck.NOTE_SPAWN_FROM_OTHER:
+            different_note_type = get_note_name(issue.extra_info["Other Note Type"])
+            return f"{issue_level} - At {timestamp} {note_type} spawns from {different_note_type}. Exact spawn position {spawn_position}"
+        case NoteCheck.NOTE_SPAWN_FROM_SAME:
+            return f"{issue_level} - At {timestamp} {note_type} spawns from same note type. Exact spawn position {spawn_position}"
+        case NoteCheck.NOTE_SPAWN_0_DISTANCE:
+            return f"{issue_level} - At {timestamp} {note_type} is a Phantom Note"
+        case _:
+            return f"At {timestamp} unimplemented error description"
 
 
 class MainWindow(QMainWindow):
+    FilterChanged = Signal()
     def __init__(self):
         super(MainWindow, self).__init__()
         self.main_box = Ui_MainWindow()
@@ -17,6 +56,8 @@ class MainWindow(QMainWindow):
         self.issues = ()
         self.main_box.setupUi(self,self.filter_dict)
         self.main_box.button.pressed.connect(self.load_csfm)
+        for group_list in self.main_box.group_lists:
+            group_list.itemChanged.connect(self.display_issues)
         self.parser = CsfmParser()
         self.watcher = QFileSystemWatcher()
         self.watcher.fileChanged.connect(self.watcher_update)
@@ -51,16 +92,20 @@ class MainWindow(QMainWindow):
         self.main_box.csfm_song_name_label.setText(self.parser.get_song_name())
         self.main_box.csfm_difficulty_label.setText(self.parser.get_difficulty())
 
+        self.display_issues()
 
 
     def display_issues(self):
-
+        self.main_box.csfm_issues_listview.clear()
+        print(self.filter_dict)
         for issue in self.issues:
-            issue_obj = QListWidgetItem(issue[1],self.main_box.csfm_issues_listview)
-            if issue[0] == "Error":
-                issue_obj.setBackground(QColor(32+150,32+110,36+110,50))
-        if not self.issues:
-            issue_obj = QListWidgetItem("No issues detected",self.main_box.csfm_issues_listview)
+            if self.filter_dict[issue.type.name] == 2:
+                issue_string = get_issue_description(issue)
+                issue_obj = QListWidgetItem(issue_string,self.main_box.csfm_issues_listview)
+                if issue.level == IssueLevel.Error:
+                    issue_obj.setBackground(QColor(32+150,32+110,36+110,50))
+            if not self.issues:
+                issue_obj = QListWidgetItem("No issues detected",self.main_box.csfm_issues_listview)
 
 
 

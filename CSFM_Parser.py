@@ -147,47 +147,90 @@ class TempoMapOutput(Enum):
     PerceivedBPMExtremes = auto()
     FlyingTime = auto()
     FlyingTimeExtremes = auto()
+class TempoMapEntry(Enum):
+    BPM = auto()
+    FlyingTime = auto()
+class TargetSpawnPrecision(Enum):
+    Normal = auto()
+    Strict = auto()
 
 class NoteCheck(Enum):
-    SpawnOnScreen = "Notes spawning on screen"
-    SpawnFromNote = "Notes spawning from other notes"
-    SpawnFromNoteType = "Notes spawning same type"
-    PhantomNote = "Notes with 0 Distance"
+    NOTE_SPAWN_ON_SCREEN =                              "Note Spawn Issue","Note spawns on screen"
+    NOTE_SPAWN_FROM_OTHER =                             "Note Spawn Issue","Note spawns from other note"
+    NOTE_SPAWN_FROM_SAME =                              "Note Spawn Issue","Note spawns from same note"
+    NOTE_SPAWN_0_DISTANCE =                             "Note Spawn Issue","Note with 0 distance"
 
-    #Doable without much trouble
-    HMultiColumns = "(WIP) Horizontal multi note placements"
-    VMultiOrder = "(WIP) Vertical Multi-Note order"
-    NotesOutsideGrid = "(WIP) Notes placed outside of grid"
-    Multi880Distance = "(WIP) 880 Distance Multi-Notes"
-    HighAmplitude = "(WIP) Too high Amplitude"
-    HighDistance = "(WIP) Too high Distance"
-    CrashingMultis = "(WIP) Multi-Notes that cause game crash"
-    NotesInGrayArea = "(WIP) Notes placed within 1st measure"
-    AbnormalBPMChanges = "(WIP) BPM Changes faster than a measure"
+    NOTE_PLACEMENT_OUTSIDE_GRID =                       "(WIP)Note Placement Issue","Note placed outside of the grid"
+    NOTE_PLACEMENT_BAD_OVERLAP =                        "(WIP)Note Placement Issue","Note creates bad overlap"
 
-    #Possible but will take time
-    ChainslideStraight = "(WIP) Chainslide placement"
-    FlyingTime50Chainslide = "(WIP) 50% flying time during Chainslide"
-    HoldsDuringChainslides = "(WIP) Holds during chainsliders"
-    SpamDuringHold= "(WIP) Spam during Holds"
+    MULTI_PLACEMENT_HORIZONTAL_MULTI_WRONG_COLUMN =     "(WIP)Multi-Note Placement Issue","Horizontal Multi-Note in wrong columns"
+    MULTI_PLACEMENT_HORIZONTAL_MULTI_DIFFERENT_HEIGHT = "(WIP)Multi-Note Placement Issue", "Horizontal Multi-Note not same height"
+    MULTI_PLACEMENT_VERTICAL_MULTI_NOT_ALIGNED =        "(WIP)Multi-Note Placement Issue","Vertical Multi-Note not aligned properly"
+    MULTI_PLACEMENT_VERTICAL_NOTE_ORDER =               "(WIP)Multi-Note Placement Issue","Vertical Multi-Note wrong note order"
+    MULTI_PLACEMENT_VERTICAL_NOTE_GAPS =                "(WIP)Multi-Note Placement Issue","Vertical Multi-Note wrong note gaps"
+    MULTI_PLACEMENT_NON_STANDARD =                      "(WIP)Multi-Note Placement Issue","Non-Standard Multi-Note"
 
-    #IDK
-    MemeGridUsed = "(WIP) 1/192 Grid being used"
-    HumanLimits = "(WIP) Spams too fast to play"
-    FrequencyMatchDirection = "(WIP) Frequency matching pattern direction"
-    AngleIncrement = "(WIP) Notes without angle increments"
-    NonStandardTriple = "(WIP) Non-Standard Horiz. Multi-Notes"
-    HardDiffHolds = "(WIP) Hard difficulty Hold Rules"
-    EndHoldInterrupt = "(WIP) Song ending before last hold maxing out"
-    SpamsOnHDorLower = "(WIP) Spams on Hard or lower"
-    BadOverlaps = "(WIP) Notes overlaping other types"
-    ShortPathOnScreen = "(WIP) Not enough of path on screen"
+    MULTI_TYPE_MORE_THAN_4 =                            "(WIP)Multi-Note Type Issue","Multi-Note has more than 4 notes"
+    MULTI_TYPE_SLIDER_AND_NORMAL =                      "(WIP)Multi-Note Type Issue","Multi-Note combines slider and normal note"
 
-    #Hard if not impossible
-    Spacing = "(WIP) Note spacing"
-    AcOrder = "(WIP) Arcade Order"
+    STYLE_MULTI_880_DISTANCE =                          "(WIP)Style Issue","Multi-Note uses 880 or less Distance"
+    STYLE_DISTANCE_TOO_HIGH =                           "(WIP)Style Issue","Distance used is too high"
+    STYLE_AMPLITUDE_TOO_HIGH =                          "(WIP)Style Issue","Amplitude used is too high"
+    STYLE_NORMAL_0_FREQUENCY =                          "(WIP)Style Issue","Normal note uses 0 Frequency"
 
+    HARD_DIFF_HOLD_ADD_AFTER_2 =                        "(WIP)Hard Difficulty Issue","Hold note added after 2 notes already held"
+    HARD_DIFF_SPAM_MORE_THAN_3 =                        "(WIP)Hard Difficulty Issue","Spam longer than 3 notes"
+    HARD_DIFF_HOLD_DURING_CHAIN =                       "(WIP)Hard Difficulty Issue","Holds during chainslider"
 
+    NEWBIE_192_GRID =                                   "(WIP)New Charter Issue","1/192 Grid was used"
+    NEWBIE_GRAYED_OUT_MEASURE =                         "(WIP)New Charter Issue","Notes placed in grayed out measure"
+    NEWBIE_ABNORMAL_BPM_CHANGE =                        "(WIP)New Charter Issue","BPM Changes faster than a measure"
+    NEWBIE_HOLD_SONG_END_CUTOFF =                       "(WIP)New Charter Issue","Song ends before hold ends"
+
+    CHAINSLIDE_NOT_STRAIGHT =                           "(WIP)Chainslide Issue","Chain slider isn't placed in straight line"
+    CHAINSLIDE_FLYING_TIME_CHANGE =                     "(WIP)Chainslide Issue","Flying Time changes during Chainslider"
+    CHAINSLIDE_NOTE_DURING =                            "(WIP)Chainslide Issue","Notes placed during Chainslider"
+    CHAINSLIDE_MULTI =                                  "(WIP)Chainslide Issue","Multi-Chainslider used"
+
+    PLAYABILITY_SPAM_DURING_HOLD =                      "(WIP)Playability Issue","Spam during Holds"
+    PLAYABILITY_SPAM_TOO_FAST =                         "(WIP)Playability Issue","Spam is too fast to play"
+    PLAYABILITY_NOT_ENOUGH_PATH =                       "(WIP)Playability Issue","Not enough of path on screen"
+
+    SPACING_TOO_FAR =                                   "(WIP)Spacing Issue","Note is too far away from previous note",
+    SPACING_TOO_CLOSE =                                 "(WIP)Spacing Issue","Note is too close to previous note"
+
+    NOTE_GROUP_WRONG_FREQ =                             "(WIP)Note Group Issue","Frequency doesn't match pattern direction"
+    NOTE_GROUP_NO_ANGLE_INCREMENT =                     "(WIP)Note Group Issue","Pattern doesn't use angle increments"
+
+    ARCADE_ORDER =                                      "(WIP)Arcade Order Issue","Shit Pattern"
+
+    def __new__(cls, category: str, description: str):
+        obj = object.__new__(cls)
+        obj._value_ = description
+        obj.category = category
+        return obj
+
+    @classmethod
+    def of_category(cls, category: str):
+        return [m for m in cls if m.category == category]
+
+    @classmethod
+    def categories(cls):
+        return {member.category for member in cls}
+
+class IssueLevel(Enum):
+    Info = auto()
+    Warning = auto()
+    ImportantWarning = auto()
+    Error = auto()
+class ChartIssue:
+    def __init__(self,level:IssueLevel,note_check:NoteCheck,note,parser:CsfmParser,extra_info_dict:dict=None):
+        self.level = level
+        self.type = note_check
+        self.note = note
+        self.parser = parser
+
+        self.extra_info = extra_info_dict
 
 
 def get_target_type_enum(target):
@@ -233,6 +276,9 @@ def calculate_time_seconds(tick, ticks_per_beat, tempo_map):
 
 
 def export_dsc(parsed_data, output_filepath, has_song=True, has_movie=True):
+
+    #TODO Needs fixing offset adjustment. Currently it breaks charts that export properly in Comfy Studio
+
     chart = parsed_data["chart"]
     time_data = chart["time"]
     tpb = chart["scale"]["ticks_per_beat"]
@@ -359,9 +405,14 @@ def get_note_spawn_point(target):
     dy = distance * math.sin(angle_rad)
 
     return x + dx, y + dy
+#### Note Checks ####
+def check_if_point_in_visible_area(position,precision:TargetSpawnPrecision):
+    button_size = 24
+    if precision == TargetSpawnPrecision.Normal:
+        button_size = 24
+    if precision == TargetSpawnPrecision.Strict:
+        button_size = 37 #Will complain even about shadow spawning on screen
 
-def check_if_point_in_visible_area(position):
-    button_size = 24 #37 if being stupid autistic about it, complains about shadow spawning on screen
     visible_area = (0-button_size,0-button_size,1920+button_size,1080+button_size)
 
 
@@ -377,15 +428,6 @@ def check_if_point_in_visible_area(position):
     if y > visible_area[3]:
         return False
     return True
-
-def round_position(position):
-    return round(position[0],None),round(position[1],None)
-def filter_target_properties(section, key:TargetProperties):
-    filtered_list = []
-    for target in section:
-        filtered_list.append(target[key.value])
-    return filtered_list
-
 def position_check_with_tolerance(position, last_section_positions, precision=5.0):
     #Ideally autistic precision of 1 would be used,
     # that however is overkill for faster songs where it's hard to spot misalignment
@@ -396,6 +438,57 @@ def position_check_with_tolerance(position, last_section_positions, precision=5.
         if distance <= precision:
             return True
     return False
+
+def note_check_spawn_on_screen(note,precision):
+    point = get_note_spawn_point(note)
+    extra_info_dict = {"Note Spawn Position": round_position(point)}
+
+    check_result = check_if_point_in_visible_area(point,precision)
+    return check_result,extra_info_dict
+def note_check_spawn_from_other(parser,note):
+    point = get_note_spawn_point(note)
+    extra_info_dict = {"Note Spawn Position": round_position(point)}
+
+    timestamp = parser.get_flying_time_at_tick(note[TargetProperties.Tick.value] - 1)
+    section = parser.get_target_section(note[TargetProperties.Tick.value], flying_time_to_beats(timestamp))
+    section_positions = filter_target_properties(get_first_target_from_section(section), TargetProperties.Position)
+
+    check_result = position_check_with_tolerance(round_position(point), section_positions)
+    return check_result,extra_info_dict
+def note_check_spawn_from_same(parser,note):
+    point = get_note_spawn_point(note)
+    extra_info_dict = {"Note Spawn Position":round_position(point)}
+
+    timestamp = parser.get_flying_time_at_tick(note[TargetProperties.Tick.value] - 1)
+    section = parser.get_target_section(note[TargetProperties.Tick.value], flying_time_to_beats(timestamp))
+    target_type = -1
+
+    for target in get_first_target_from_section(section):
+        target_position = round_position(target[TargetProperties.Position.value])
+        if position_check_with_tolerance(target_position, [round_position(point)]):
+            target_type = target[TargetProperties.Type.value]
+            extra_info_dict.update({"Other Note Type":target_type})
+
+    check_result = note[TargetProperties.Type.value] == target_type
+    return check_result, extra_info_dict
+
+def note_check_spawn_0_distance(note):
+    point = get_note_spawn_point(note)
+    extra_info_dict = {"Note Spawn Position": round_position(point)}
+
+    check_result = note[TargetProperties.Distance.value] == 0
+    return check_result, extra_info_dict
+
+#####################
+
+def round_position(position):
+    return round(position[0],None),round(position[1],None)
+def filter_target_properties(section, key:TargetProperties):
+    filtered_list = []
+    for target in section:
+        filtered_list.append(target[key.value])
+    return filtered_list
+
 
 class CsfmParser:
     MAGIC_BYTES = b'CSFM'
@@ -766,12 +859,19 @@ class CsfmParser:
         milliseconds = int((total_seconds * 1000) % 1000)
 
         return f"{minutes:02d}:{seconds:02d}.{milliseconds:03d}"
+    def get_tempo_map(self):
+        tempo_list = []
+
+        for entry in self.chart[ChartProperties.TempoMap.value]:
+            tempo_list.append((round(entry[TempoMapProperties.Tempo.value],2),(round(entry[TempoMapProperties.FlyingTimeFactor.value] * 100))))
+
+        return tempo_list
     def get_tempo_map_string(self,output_type:TempoMapOutput=TempoMapOutput.Full):
         tempo_list = []
         output_string = ""
 
         for entry in self.chart[ChartProperties.TempoMap.value]:
-            tempo_list.append((entry[TempoMapProperties.Tempo.value],(round(entry[TempoMapProperties.FlyingTimeFactor.value] * 100))))
+            tempo_list.append((round(entry[TempoMapProperties.Tempo.value],2),(round(entry[TempoMapProperties.FlyingTimeFactor.value] * 100))))
 
         match output_type:
             case TempoMapOutput.Full:
@@ -799,9 +899,9 @@ class CsfmParser:
                 for entry in tempo_list:
                     if entry[0]*(entry[1]/100) != previous_bpm:
                         if output_string:
-                            output_string = output_string + " -> " + f"{entry[0]*(entry[1]/100)}"
+                            output_string = output_string + " -> " + f"{round(entry[0]*(entry[1]/100),2)}"
                         else:
-                            output_string = f"{entry[0]*(entry[1]/100)}"
+                            output_string = f"{round(entry[0]*(entry[1]/100),2)}"
 
                         previous_bpm = entry[0]*(entry[1]/100)
                     else:
@@ -833,9 +933,9 @@ class CsfmParser:
                         lowest_bpm_seen = entry[0]*(entry[1]/100)
 
                 if lowest_bpm_seen == highest_bpm_seen:
-                    output_string = f"{lowest_bpm_seen}"
+                    output_string = f"{round(lowest_bpm_seen,2)}"
                 else:
-                    output_string = f"({lowest_bpm_seen} - {highest_bpm_seen})"
+                    output_string = f"({round(lowest_bpm_seen,2)} - {round(highest_bpm_seen,2)})"
 
 
             case TempoMapOutput.FlyingTime:
@@ -929,39 +1029,9 @@ class CsfmParser:
         ]
         return recent_targets
 
-    def note_check(self,check:NoteCheck,note):
-        point = get_note_spawn_point(note)
-        match check:
-            case NoteCheck.SpawnOnScreen:
-                return check_if_point_in_visible_area(point)
-            case NoteCheck.SpawnFromNote:
-
-
-                timestamp =  self.get_flying_time_at_tick(note[TargetProperties.Tick.value] - 1)
-                section = self.get_target_section(note[TargetProperties.Tick.value],flying_time_to_beats(timestamp))
-                section_positions = filter_target_properties(get_first_target_from_section(section), TargetProperties.Position)
-
-
-                return position_check_with_tolerance(round_position(point),section_positions)
-
-            case NoteCheck.SpawnFromNoteType:
-
-                timestamp = self.get_flying_time_at_tick(note[TargetProperties.Tick.value] - 1)
-                section = self.get_target_section(note[TargetProperties.Tick.value],flying_time_to_beats(timestamp))
-                target_type = -1
-
-
-                for target in get_first_target_from_section(section):
-                    target_position = round_position(target[TargetProperties.Position.value])
-                    if position_check_with_tolerance(target_position,[round_position(point)]):
-                        target_type = target[TargetProperties.Type.value]
-
-                return note[TargetProperties.Type.value] == target_type
-
-            case NoteCheck.PhantomNote:
-                    return note[TargetProperties.Distance.value] == 0
 
     def scan_csfm(self,file):
+        note_spawn_precision = TargetSpawnPrecision.Normal
         self.parse(file)
 
         print(self.get_song_name())
@@ -971,21 +1041,25 @@ class CsfmParser:
 
         issues_list = []
         for note in self.chart[ChartProperties.Targets.value]:
-            point = get_note_spawn_point(note)
+            note_spawns_on_screen,extra_info_dict = note_check_spawn_on_screen(note,note_spawn_precision)
+            if note_spawns_on_screen:
+                note_spawns_from_other,extra_info_dict = note_check_spawn_from_other(self,note)
+                note_has_0_distance,extra_info_dict = note_check_spawn_0_distance(note)
 
-            if self.note_check(NoteCheck.SpawnOnScreen, note):
-                if self.note_check(NoteCheck.SpawnFromNote, note):
-                    if self.note_check(NoteCheck.SpawnFromNoteType,note):
-                        issues_list.append(("Info",f"At {self.get_time_from_tick(note[TargetProperties.Tick.value])} Note spawns from other note of same type. Exact spawn position {round_position(point)}"))
+                if note_spawns_from_other:
+                    note_spawns_from_same_type , extra_info_dict = note_check_spawn_from_same(self,note)
+
+                    if note_spawns_from_same_type:
+                        issues_list.append(ChartIssue(IssueLevel.Info,NoteCheck.NOTE_SPAWN_FROM_SAME,note,self,extra_info_dict))
+
                     else:
-                        issues_list.append(("Error",f"At {self.get_time_from_tick(note[TargetProperties.Tick.value])} Note spawns from other note of different type. Exact spawn position {round_position(point)}"))
+                        issues_list.append(ChartIssue(IssueLevel.Error,NoteCheck.NOTE_SPAWN_FROM_OTHER,note,self,extra_info_dict))
 
+                elif note_has_0_distance:
+                    issues_list.append(ChartIssue(IssueLevel.Info,NoteCheck.NOTE_SPAWN_0_DISTANCE,note,self,extra_info_dict))
 
-
-                elif self.note_check(NoteCheck.PhantomNote, note):
-                    issues_list.append(("Info",f"At {self.get_time_from_tick(note[TargetProperties.Tick.value])} Phantom Note."))
                 else:
-                    issues_list.append(("Error",f"At {self.get_time_from_tick(note[TargetProperties.Tick.value])} Note spawns on screen. Exact spawn position {round_position(point)}. Distance {note[TargetProperties.Distance.value]}"))
+                    issues_list.append(ChartIssue(IssueLevel.Error,NoteCheck.NOTE_SPAWN_ON_SCREEN,note,self,extra_info_dict))
 
         return issues_list
     def scan_folder(self,folder):

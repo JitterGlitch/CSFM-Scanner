@@ -1,6 +1,6 @@
 from PySide6.QtCore import (QCoreApplication, QLocale,
                             QMetaObject, QRect,
-                            QSize, Qt)
+                            QSize, Qt, Signal)
 from PySide6.QtGui import (QFont, QIcon)
 from PySide6.QtWidgets import (QAbstractScrollArea, QComboBox,
                                QDoubleSpinBox, QFrame, QGridLayout, QHBoxLayout,
@@ -64,27 +64,27 @@ class Ui_MainWindow(object):
         self.filter_scrollarea_contents = QWidget()
         self.filter_scrollarea_contents_layout = QVBoxLayout()
         self.filter_scrollarea_contents.setLayout(self.filter_scrollarea_contents_layout)
+        self.group_lists = []
 
-
-        for check in NoteCheck:
-            if not check.value[0].startswith("(WIP)"):
-                check_group_label = QLabel(check.value[0])
+        for category in NoteCheck.categories():
+            if not category.startswith("(WIP)"):
+                check_group_label = QLabel(category)
 
                 font = check_group_label.font()
                 font.setBold(True)
                 check_group_label.setFont(font)
-
                 group_listview = QListWidget()
                 group_listview.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-                group_listview.itemChanged.connect(lambda sub_issue_item,issue=check.value[0] : self.update_dict(filter_dict,issue,sub_issue_item))
-
-                for sub_issue in check.value[1]:
-                    item = QListWidgetItem(sub_issue)
+                group_listview.itemChanged.connect(lambda sub_issue_item : self.update_dict(filter_dict,sub_issue_item))
+                self.group_lists.append(group_listview)
+                for sub_issue in NoteCheck.of_category(category):
+                    item = QListWidgetItem(sub_issue.value)
+                    item.enum = sub_issue.name
                     item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
 
                     item.setCheckState(Qt.CheckState.Checked)
-                    dict_key = check.value[0] + "(" + sub_issue +")"
-                    filter_dict[dict_key] = item.checkState()
+                    dict_key = sub_issue.name
+                    filter_dict[dict_key] = item.checkState().value
                     group_listview.addItem(item)
 
 
@@ -127,8 +127,8 @@ class Ui_MainWindow(object):
         self.main_hbox_layout.addLayout(self.layout)
         self.main_hbox_layout.addWidget(self.side_config_frame)
 
-    def update_dict(self,filter_dict,item,sub_issue_item):
-        sub_issue=  sub_issue_item.text()
-        dict_key = item + "(" + sub_issue + ")"
+    def update_dict(self,filter_dict,sub_issue_item):
+        sub_issue =  sub_issue_item
+        dict_key = sub_issue.enum
 
-        filter_dict[dict_key] = sub_issue_item.checkState()
+        filter_dict[dict_key] = sub_issue_item.checkState().value
