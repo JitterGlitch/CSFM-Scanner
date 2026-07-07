@@ -173,7 +173,7 @@ class NoteCheck(Enum):
     MULTI_TYPE_MORE_THAN_4 =                            "(WIP)Multi-Note Type Issue","Multi-Note has more than 4 notes"
     MULTI_TYPE_SLIDER_AND_NORMAL =                      "(WIP)Multi-Note Type Issue","Multi-Note combines slider and normal note"
 
-    STYLE_MULTI_880_DISTANCE =                          "(WIP)Style Issue","Multi-Note uses 880 or less Distance"
+    STYLE_MULTI_880_DISTANCE =                          "Style Issue","Multi-Note uses 880 or less Distance"
     STYLE_DISTANCE_TOO_HIGH =                           "(WIP)Style Issue","Distance used is too high"
     STYLE_AMPLITUDE_TOO_HIGH =                          "(WIP)Style Issue","Amplitude used is too high"
     STYLE_NORMAL_0_FREQUENCY =                          "(WIP)Style Issue","Normal note uses 0 Frequency"
@@ -229,9 +229,23 @@ class ChartIssue:
         self.type = note_check
         self.note = note
         self.parser = parser
+        self.note_type = self.get_note_type()
+        self.timestamp = self.get_timestamp()
 
         self.extra_info = extra_info_dict
-
+    def get_note_type(self):
+        if type(self.note) == list:
+            output = "Multi-Note:"
+            for note in self.note:
+                output = output +" "+ str(get_target_type_enum(note).name)
+        else:
+            output = str(get_target_type_enum(self.note).name)
+        return output
+    def get_timestamp(self):
+        if type(self.note) == list:
+            return self.note[0][TargetProperties.Tick.value]
+        else:
+            return self.note[TargetProperties.Tick.value]
 
 def get_target_type_enum(target):
     btn_type = target.get("Type", 3)
@@ -466,10 +480,10 @@ def note_check_spawn_from_same(parser,note):
     for target in get_first_target_from_section(section):
         target_position = round_position(target[TargetProperties.Position.value])
         if position_check_with_tolerance(target_position, [round_position(point)]):
-            target_type = target[TargetProperties.Type.value]
+            target_type = get_target_type_enum(target).name
             extra_info_dict.update({"Other Note Type":target_type})
 
-    check_result = note[TargetProperties.Type.value] == target_type
+    check_result = get_target_type_enum(note).name == target_type
     return check_result, extra_info_dict
 
 def note_check_spawn_0_distance(note):
@@ -478,6 +492,15 @@ def note_check_spawn_0_distance(note):
 
     check_result = note[TargetProperties.Distance.value] == 0
     return check_result, extra_info_dict
+
+#### Multi Checks ####
+
+def multi_check_distance(multi_note,distance):
+    for note in multi_note:
+        if note[TargetProperties.Distance.value] <= distance:
+            return True
+
+    return False
 
 #####################
 
@@ -1066,6 +1089,10 @@ class CsfmParser:
 
                 else:
                     issues_list.append(ChartIssue(IssueLevel.Error,NoteCheck.NOTE_SPAWN_ON_SCREEN,note,self,extra_info_dict))
+
+        for multi_note in self.get_multi_note_list():
+            if multi_check_distance(multi_note,880):
+                issues_list.append(ChartIssue(IssueLevel.Error, NoteCheck.STYLE_MULTI_880_DISTANCE, multi_note, self))
 
         return issues_list
     def scan_folder(self,folder,precision:TargetSpawnPrecision):
