@@ -859,16 +859,9 @@ class CsfmParser:
         milliseconds = int((total_seconds * 1000) % 1000)
 
         return f"{minutes:02d}:{seconds:02d}.{milliseconds:03d}"
-    def get_tempo_map(self):
+    def get_tempo_map(self,output_type:TempoMapOutput=TempoMapOutput.Full):
         tempo_list = []
-
-        for entry in self.chart[ChartProperties.TempoMap.value]:
-            tempo_list.append((round(entry[TempoMapProperties.Tempo.value],2),(round(entry[TempoMapProperties.FlyingTimeFactor.value] * 100))))
-
-        return tempo_list
-    def get_tempo_map_string(self,output_type:TempoMapOutput=TempoMapOutput.Full):
-        tempo_list = []
-        output_string = ""
+        output = []
 
         for entry in self.chart[ChartProperties.TempoMap.value]:
             tempo_list.append((round(entry[TempoMapProperties.Tempo.value],2),(round(entry[TempoMapProperties.FlyingTimeFactor.value] * 100))))
@@ -876,19 +869,13 @@ class CsfmParser:
         match output_type:
             case TempoMapOutput.Full:
                 for entry in tempo_list:
-                    if output_string:
-                        output_string = output_string + " -> " + f"{entry[0]} ({entry[1]}%)"
-                    else:
-                        output_string = f"{entry[0]} ({entry[1]}%)"
+                        output.append((entry[0],entry[1]))
 
             case TempoMapOutput.BPM:
                 previous_bpm = 0.0
                 for entry in tempo_list:
                     if entry[0] != previous_bpm:
-                        if output_string:
-                            output_string = output_string + " -> " + f"{entry[0]}"
-                        else:
-                            output_string = f"{entry[0]}"
+                        output.append(entry[0])
 
                         previous_bpm = entry[0]
                     else:
@@ -898,11 +885,7 @@ class CsfmParser:
                 previous_bpm = 0.0
                 for entry in tempo_list:
                     if entry[0]*(entry[1]/100) != previous_bpm:
-                        if output_string:
-                            output_string = output_string + " -> " + f"{round(entry[0]*(entry[1]/100),2)}"
-                        else:
-                            output_string = f"{round(entry[0]*(entry[1]/100),2)}"
-
+                        output.append(round(entry[0]*(entry[1]/100),2))
                         previous_bpm = entry[0]*(entry[1]/100)
                     else:
                         continue
@@ -918,9 +901,9 @@ class CsfmParser:
                         lowest_bpm_seen = entry[0]
 
                 if lowest_bpm_seen == highest_bpm_seen:
-                    output_string = f"{lowest_bpm_seen}"
+                    output.append(lowest_bpm_seen)
                 else:
-                    output_string = f"({lowest_bpm_seen} - {highest_bpm_seen})"
+                    output.append((lowest_bpm_seen,highest_bpm_seen))
 
             case TempoMapOutput.PerceivedBPMExtremes:
                 lowest_bpm_seen = 9999999
@@ -933,20 +916,16 @@ class CsfmParser:
                         lowest_bpm_seen = entry[0]*(entry[1]/100)
 
                 if lowest_bpm_seen == highest_bpm_seen:
-                    output_string = f"{round(lowest_bpm_seen,2)}"
+                    output.append(round(lowest_bpm_seen,2))
                 else:
-                    output_string = f"({round(lowest_bpm_seen,2)} - {round(highest_bpm_seen,2)})"
+                    output.append((round(lowest_bpm_seen,2),round(highest_bpm_seen,2)))
 
 
             case TempoMapOutput.FlyingTime:
                 previous_flying_time = 0.0
                 for entry in tempo_list:
                     if entry[1] != previous_flying_time:
-                        if output_string:
-                            output_string = output_string + " -> " + f"{entry[1]}%"
-                        else:
-                            output_string = f"{entry[1]}%"
-
+                        output.append(entry[1])
                         previous_flying_time = entry[1]
                     else:
                         continue
@@ -962,13 +941,13 @@ class CsfmParser:
                         lowest_flying_time_seen = entry[1]
 
                 if lowest_flying_time_seen == highest_flying_time_seen:
-                    output_string = f"{lowest_flying_time_seen}%"
+                    output.append(lowest_flying_time_seen)
                 else:
-                    output_string = f"({lowest_flying_time_seen}% - {highest_flying_time_seen}%)"
+                    output.append((lowest_flying_time_seen,highest_flying_time_seen))
 
 
 
-        return output_string
+        return output
 
 
     def get_flying_time_at_tick(self,tick):
