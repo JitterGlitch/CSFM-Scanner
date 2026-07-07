@@ -65,7 +65,9 @@ class Ui_MainWindow(object):
         self.filter_scrollarea_contents.setLayout(self.filter_scrollarea_contents_layout)
         self.group_lists = []
 
-        for category in NoteCheck.categories():
+        category_list = sorted(NoteCheck.categories())
+
+        for category in category_list:
             if not category.startswith("(WIP)"):
                 check_group_label = QLabel(category)
 
