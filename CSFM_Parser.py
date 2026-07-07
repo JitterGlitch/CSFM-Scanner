@@ -182,6 +182,7 @@ class NoteCheck(Enum):
     HARD_DIFF_SPAM_MORE_THAN_3 =                        "(WIP)Hard Difficulty Issue","Spam longer than 3 notes"
     HARD_DIFF_HOLD_DURING_CHAIN =                       "(WIP)Hard Difficulty Issue","Holds during chainslider"
 
+    NEWBIE_UNSET_NOTE =                                 "New Charter Issue","Note has placeholder placements"
     NEWBIE_192_GRID =                                   "(WIP)New Charter Issue","1/192 Grid was used"
     NEWBIE_GRAYED_OUT_MEASURE =                         "(WIP)New Charter Issue","Notes placed in grayed out measure"
     NEWBIE_ABNORMAL_BPM_CHANGE =                        "(WIP)New Charter Issue","BPM Changes faster than a measure"
@@ -452,6 +453,17 @@ def position_check_with_tolerance(position, last_section_positions, precision=5.
         if distance <= precision:
             return True
     return False
+
+def note_check_unset_position(note):
+    position = note[TargetProperties.Position.value]
+
+    x = position[0]
+    y = position[1]
+
+    if x == 0 or y == 0:
+        return True
+    else:
+        return False
 
 def note_check_spawn_on_screen(note,precision):
     point = get_note_spawn_point(note)
@@ -1070,6 +1082,11 @@ class CsfmParser:
 
         issues_list = []
         for note in self.chart[ChartProperties.Targets.value]:
+
+            if note_check_unset_position(note):
+                issues_list.append(ChartIssue(IssueLevel.Error,NoteCheck.NEWBIE_UNSET_NOTE,note,self))
+                continue
+
             note_spawns_on_screen,extra_info_dict = note_check_spawn_on_screen(note,note_spawn_precision)
             if note_spawns_on_screen:
                 note_spawns_from_other,extra_info_dict = note_check_spawn_from_other(self,note)

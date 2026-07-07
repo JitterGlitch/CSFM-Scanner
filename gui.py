@@ -31,6 +31,8 @@ def get_issue_description(issue:ChartIssue):
             return f"{issue_level} - At {timestamp} {note_type} is a Phantom Note"
         case NoteCheck.STYLE_MULTI_880_DISTANCE:
             return f"{issue_level} - At {timestamp} {note_type} has 880 distance or lower"
+        case NoteCheck.NEWBIE_UNSET_NOTE:
+            return f"{issue_level} - At {timestamp} {note_type} has placeholder placements"
         case _:
             return f"At {timestamp} unimplemented error description"
 
