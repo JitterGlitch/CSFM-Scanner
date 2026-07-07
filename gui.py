@@ -52,6 +52,7 @@ class MainWindow(QMainWindow):
         self.parser = CsfmParser()
         self.watcher = QFileSystemWatcher()
         self.watcher.fileChanged.connect(self.watcher_update)
+        self.currently_loaded_csfm = None
 
     def watcher_update(self,path):
         print("running")
@@ -61,9 +62,8 @@ class MainWindow(QMainWindow):
         self.watcher.addPath(str(path))
         self.load_csfm([path,'*.csfm'])
     def target_precision_changed(self):
-        print(self.parser.metadata)
         if self.parser.metadata != {}:
-            self.load_csfm(self.watcher.files())
+            self.load_csfm(self.currently_loaded_csfm)
     def load_csfm(self,csfm_location:str=None):
         if csfm_location is None:
             csfm_location = QFileDialog.getOpenFileName(self,
@@ -78,7 +78,7 @@ class MainWindow(QMainWindow):
             self.watcher.addPath(str(csfm_location[0]))
 
 
-
+        self.currently_loaded_csfm = csfm_location
         self.main_box.csfm_issues_listview.clear()
 
         self.issues = self.parser.scan_csfm(csfm_location[0],self.main_box.target_spawn_precision_combobox.currentEnum())
