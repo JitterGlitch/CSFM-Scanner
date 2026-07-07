@@ -948,6 +948,33 @@ class CsfmParser:
 
 
         return output
+    def get_target_list(self):
+        return self.chart[ChartProperties.Targets.value]
+
+    def get_multi_note_list(self):
+        target_list = self.get_target_list()
+
+        previous_tick = -1
+        multi_note_list = []
+        temp_group = []
+        for target in target_list:
+            if target[TargetProperties.Tick.value] == previous_tick:
+                temp_group.append(target)
+            else:
+                if temp_group:
+                    multi_note_list.append(temp_group)
+                temp_group = []
+                previous_tick = target[TargetProperties.Tick.value]
+                temp_group.append(target)
+
+        if temp_group:
+            multi_note_list.append(temp_group)
+
+        for entry in multi_note_list:
+            if len(entry) == 1:
+                multi_note_list.remove(entry)
+
+        return multi_note_list
 
 
     def get_flying_time_at_tick(self,tick):
@@ -995,7 +1022,7 @@ class CsfmParser:
         return f"{minutes:02d}:{seconds:02d}.{milliseconds:03d}"
     def get_target_section(self,tick, beats):
         current_tick = tick
-        targets = self.chart[ChartProperties.Targets.value]
+        targets = self.get_target_list()
         ticks_per_beat = self.chart[ChartProperties.Scale.value][ScaleProperties.TicksPerBeat.value]
 
         ticks_in_window = beats * ticks_per_beat
