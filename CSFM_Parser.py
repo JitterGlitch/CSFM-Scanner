@@ -1041,13 +1041,15 @@ class CsfmParser:
                     issues_list.append(ChartIssue(IssueLevel.Error,NoteCheck.NOTE_SPAWN_ON_SCREEN,note,self,extra_info_dict))
 
         return issues_list
-    def scan_folder(self,folder):
+    def scan_folder(self,folder,precision:TargetSpawnPrecision):
+        note_spawn_precision = precision
+
         directory = os.fsencode(folder)
 
         for file in os.listdir(directory):
             filename = os.fsdecode(file)
             if filename.endswith(".csfm"):
-                self.scan_csfm(str(folder)+ "/" + str(filename))
+                self.scan_csfm(str(folder)+ "/" + str(filename),note_spawn_precision)
 
 
 
