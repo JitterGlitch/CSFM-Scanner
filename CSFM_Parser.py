@@ -170,13 +170,14 @@ class NoteCheck(Enum):
     MULTI_PLACEMENT_VERTICAL_NOTE_GAPS =                "(WIP)Multi-Note Placement Issue","Vertical Multi-Note wrong note gaps"
     MULTI_PLACEMENT_NON_STANDARD =                      "(WIP)Multi-Note Placement Issue","Non-Standard Multi-Note"
 
-    MULTI_TYPE_MORE_THAN_4 =                            "(WIP)Multi-Note Type Issue","Multi-Note has more than 4 notes"
+    MULTI_TYPE_MORE_THAN_4 =                            "Multi-Note Type Issue","Multi-Note has more than 4 notes"
     MULTI_TYPE_SLIDER_AND_NORMAL =                      "(WIP)Multi-Note Type Issue","Multi-Note combines slider and normal note"
 
-    STYLE_MULTI_880_DISTANCE =                          "Style Issue","Multi-Note uses 880 or less Distance"
-    STYLE_DISTANCE_TOO_HIGH =                           "(WIP)Style Issue","Distance used is too high"
-    STYLE_AMPLITUDE_TOO_HIGH =                          "(WIP)Style Issue","Amplitude used is too high"
-    STYLE_NORMAL_0_FREQUENCY =                          "(WIP)Style Issue","Normal note uses 0 Frequency"
+    STYLE_MULTI_880_DISTANCE =                          "Style Issue","Multi-Note uses 880 or less distance"
+    STYLE_DISTANCE_TOO_HIGH =                           "Style Issue","Distance used is too high"
+    STYLE_AMPLITUDE_TOO_HIGH =                          "Style Issue","Amplitude used is too high"
+    STYLE_FREQUENCY_TOO_HIGH =                          "Style Issue", "Frequency used is too high"
+    STYLE_NORMAL_0_FREQUENCY =                          "(WIP)Style Issue","Normal note uses 0 frequency"
 
     HARD_DIFF_HOLD_ADD_AFTER_2 =                        "(WIP)Hard Difficulty Issue","Hold note added after 2 notes already held"
     HARD_DIFF_SPAM_MORE_THAN_3 =                        "(WIP)Hard Difficulty Issue","Spam longer than 3 notes"
@@ -1090,6 +1091,14 @@ class CsfmParser:
             if not check_if_point_in_grid(note[TargetProperties.Position.value]):
                 issues_list.append(ChartIssue(IssueLevel.Error, NoteCheck.NOTE_PLACEMENT_OUTSIDE_GRID, note, self))
 
+            if note[TargetProperties.Amplitude.value] > 5000:
+                issues_list.append(ChartIssue(IssueLevel.Info,NoteCheck.STYLE_AMPLITUDE_TOO_HIGH,note,self))
+            if note[TargetProperties.Distance.value] > 5000:
+                issues_list.append(ChartIssue(IssueLevel.Info,NoteCheck.STYLE_DISTANCE_TOO_HIGH,note,self))
+            if note[TargetProperties.Frequency.value] > 4 or note[TargetProperties.Frequency.value] < -4:
+                issues_list.append(ChartIssue(IssueLevel.Info,NoteCheck.STYLE_FREQUENCY_TOO_HIGH,note,self))
+
+
             note_spawns_on_screen,extra_info_dict = note_check_spawn_on_screen(note,note_spawn_precision)
             if note_spawns_on_screen:
                 note_spawns_from_other,extra_info_dict = note_check_spawn_from_other(self,note)
@@ -1113,6 +1122,10 @@ class CsfmParser:
         for multi_note in self.get_multi_note_list():
             if multi_check_distance(multi_note,880):
                 issues_list.append(ChartIssue(IssueLevel.Error, NoteCheck.STYLE_MULTI_880_DISTANCE, multi_note, self))
+
+            if len(multi_note) > 4:
+                issues_list.append(ChartIssue(IssueLevel.Error, NoteCheck.MULTI_TYPE_MORE_THAN_4, multi_note, self))
+
 
         return issues_list
     def scan_folder(self,folder,precision:TargetSpawnPrecision):

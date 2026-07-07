@@ -31,8 +31,16 @@ def get_issue_description(issue:ChartIssue):
             return f"{issue_level} - At {timestamp} {note_type} is a Phantom Note"
         case NoteCheck.NOTE_PLACEMENT_OUTSIDE_GRID:
             return f"{issue_level} - At {timestamp} {note_type} is outside of the grid"
+        case NoteCheck.MULTI_TYPE_MORE_THAN_4:
+            return f"{issue_level} - At {timestamp} {note_type} contains more than 4 notes. THIS WILL CAUSE GAME TO CRASH"
         case NoteCheck.STYLE_MULTI_880_DISTANCE:
             return f"{issue_level} - At {timestamp} {note_type} has 880 distance or lower"
+        case NoteCheck.STYLE_DISTANCE_TOO_HIGH:
+            return f"{issue_level} - At {timestamp} {note_type} has too high distance"
+        case NoteCheck.STYLE_AMPLITUDE_TOO_HIGH:
+            return f"{issue_level} - At {timestamp} {note_type} has too high amplitude"
+        case NoteCheck.STYLE_FREQUENCY_TOO_HIGH:
+            return f"{issue_level} - At {timestamp} {note_type} has too high frequency"
         case NoteCheck.NEWBIE_UNSET_NOTE:
             return f"{issue_level} - At {timestamp} {note_type} has placeholder placements"
         case _:
