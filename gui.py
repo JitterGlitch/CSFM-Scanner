@@ -29,6 +29,8 @@ def get_issue_description(issue:ChartIssue):
             return f"{issue_level} - At {timestamp} {note_type} spawns from same note type. Exact spawn position {spawn_position}"
         case NoteCheck.NOTE_SPAWN_0_DISTANCE:
             return f"{issue_level} - At {timestamp} {note_type} is a Phantom Note"
+        case NoteCheck.NOTE_PLACEMENT_OUTSIDE_GRID:
+            return f"{issue_level} - At {timestamp} {note_type} is outside of the grid"
         case NoteCheck.STYLE_MULTI_880_DISTANCE:
             return f"{issue_level} - At {timestamp} {note_type} has 880 distance or lower"
         case NoteCheck.NEWBIE_UNSET_NOTE:

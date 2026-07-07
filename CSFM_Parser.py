@@ -160,11 +160,11 @@ class NoteCheck(Enum):
     NOTE_SPAWN_FROM_SAME =                              "Note Spawn Issue","Note spawns from same note"
     NOTE_SPAWN_0_DISTANCE =                             "Note Spawn Issue","Note with 0 distance"
 
-    NOTE_PLACEMENT_OUTSIDE_GRID =                       "(WIP)Note Placement Issue","Note placed outside of the grid"
+    NOTE_PLACEMENT_OUTSIDE_GRID =                       "Note Placement Issue","Note placed outside of the grid"
     NOTE_PLACEMENT_BAD_OVERLAP =                        "(WIP)Note Placement Issue","Note creates bad overlap"
 
     MULTI_PLACEMENT_HORIZONTAL_MULTI_WRONG_COLUMN =     "(WIP)Multi-Note Placement Issue","Horizontal Multi-Note in wrong columns"
-    MULTI_PLACEMENT_HORIZONTAL_MULTI_DIFFERENT_HEIGHT = "(WIP)Multi-Note Placement Issue", "Horizontal Multi-Note not same height"
+    MULTI_PLACEMENT_HORIZONTAL_MULTI_DIFFERENT_HEIGHT = "(WIP)Multi-Note Placement Issue","Horizontal Multi-Note not same height"
     MULTI_PLACEMENT_VERTICAL_MULTI_NOT_ALIGNED =        "(WIP)Multi-Note Placement Issue","Vertical Multi-Note not aligned properly"
     MULTI_PLACEMENT_VERTICAL_NOTE_ORDER =               "(WIP)Multi-Note Placement Issue","Vertical Multi-Note wrong note order"
     MULTI_PLACEMENT_VERTICAL_NOTE_GAPS =                "(WIP)Multi-Note Placement Issue","Vertical Multi-Note wrong note gaps"
@@ -428,21 +428,21 @@ def check_if_point_in_visible_area(position,precision:TargetSpawnPrecision):
     if precision == TargetSpawnPrecision.Strict:
         button_size = 37 #Will complain even about shadow spawning on screen
 
-    visible_area = (0-button_size,0-button_size,1920+button_size,1080+button_size)
+    x_min, y_min, x_max, y_max = 0-button_size,0-button_size,1920+button_size,1080+button_size
 
 
     x = position[0]
     y = position[1]
 
-    if x < visible_area[0]:
-        return False
-    if x > visible_area[2]:
-        return False
-    if y < visible_area[1]:
-        return False
-    if y > visible_area[3]:
-        return False
-    return True
+    return x_min <= x <= x_max and y_min <= y <= y_max
+def check_if_point_in_grid(position):
+
+    x = position[0]
+    y = position[1]
+
+    x_min, y_min, x_max, y_max = 96, 192, 1824, 864
+
+    return x_min <= x <= x_max and y_min <= y <= y_max
 def position_check_with_tolerance(position, last_section_positions, precision=5.0):
     #Ideally autistic precision of 1 would be used,
     # that however is overkill for faster songs where it's hard to spot misalignment
@@ -1086,6 +1086,9 @@ class CsfmParser:
             if note_check_unset_position(note):
                 issues_list.append(ChartIssue(IssueLevel.Error,NoteCheck.NEWBIE_UNSET_NOTE,note,self))
                 continue
+
+            if not check_if_point_in_grid(note[TargetProperties.Position.value]):
+                issues_list.append(ChartIssue(IssueLevel.Error, NoteCheck.NOTE_PLACEMENT_OUTSIDE_GRID, note, self))
 
             note_spawns_on_screen,extra_info_dict = note_check_spawn_on_screen(note,note_spawn_precision)
             if note_spawns_on_screen:
