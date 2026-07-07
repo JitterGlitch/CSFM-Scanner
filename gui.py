@@ -80,6 +80,7 @@ class MainWindow(QMainWindow):
         self.main_box.csfm_issues_listview.clear()
 
         self.issues = self.parser.scan_csfm(csfm_location[0],self.main_box.target_spawn_precision_combobox.currentEnum())
+        self.issues = sorted(self.issues,key=lambda issue: issue.timestamp)
 
         self.main_box.csfm_file_label.setText(Path(csfm_location[0]).name)
         self.main_box.csfm_song_name_label.setText(self.parser.get_song_name())
