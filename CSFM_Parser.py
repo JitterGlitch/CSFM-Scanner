@@ -179,7 +179,8 @@ class NoteCheck(Enum):
     STYLE_FREQUENCY_TOO_HIGH =                          "Style Issue", "Frequency used is too high"
     STYLE_NORMAL_0_FREQUENCY =                          "(WIP)Style Issue","Normal note uses 0 frequency"
 
-    HARD_DIFF_HOLD_ADD_AFTER_2 =                        "(WIP)Hard Difficulty Issue","Hold note added after 2 notes already held"
+    HARD_DIFF_MULTI_NOT_FULL_HOLD =                     "(WIP)Hard Difficulty Issue","Multi-Note has partial holds"
+    HARD_DIFF_HOLD_ADD_AFTER_2 =                        "(WIP)Hard Difficulty Issue","Multi-Note added after 2 notes already held"
     HARD_DIFF_SPAM_MORE_THAN_3 =                        "(WIP)Hard Difficulty Issue","Spam longer than 3 notes"
     HARD_DIFF_HOLD_DURING_CHAIN =                       "(WIP)Hard Difficulty Issue","Holds during chainslider"
 
@@ -198,7 +199,7 @@ class NoteCheck(Enum):
     PLAYABILITY_SPAM_TOO_FAST =                         "(WIP)Playability Issue","Spam is too fast to play"
     PLAYABILITY_NOT_ENOUGH_PATH =                       "(WIP)Playability Issue","Not enough of path on screen"
 
-    SPACING_TOO_FAR =                                   "(WIP)Spacing Issue","Note is too far away from previous note",
+    SPACING_TOO_FAR =                                   "(WIP)Spacing Issue","Note is too far away from previous note"
     SPACING_TOO_CLOSE =                                 "(WIP)Spacing Issue","Note is too close to previous note"
 
     NOTE_GROUP_WRONG_FREQ =                             "(WIP)Note Group Issue","Frequency doesn't match pattern direction"
@@ -291,100 +292,6 @@ def calculate_time_seconds(tick, ticks_per_beat, tempo_map):
     return total_seconds
 
 
-def export_dsc(parsed_data, output_filepath, has_song=True, has_movie=True):
-
-    #TODO Needs fixing offset adjustment. Currently it breaks charts that export properly in Comfy Studio
-
-    chart = parsed_data["chart"]
-    time_data = chart["time"]
-    tpb = chart["scale"]["ticks_per_beat"]
-    tempo_map = chart["tempo_map"]
-
-    timeline = defaultdict(list)
-
-    def queue_command(seconds, opcode, params=[]):
-        time_point = int(seconds * 100000.0)
-        timeline[time_point].append((opcode, params))
-
-    song_offset = abs(time_data.get("Song Offset")) if has_song else 0.0
-    movie_offset = abs(time_data.get("Movie Offset")) if has_movie else 0.0
-
-    delay_offset = max(song_offset, movie_offset, 0.0)
-
-
-    song_play_time = song_offset #it needs to factor in delay_offset
-    movie_play_time = movie_offset #it needs to factor in delay_offset
-
-    print(song_offset)
-    print(delay_offset)
-
-    print(song_play_time)
-    print(movie_play_time)
-
-    queue_command(0.0, Opcodes.CHANGE_FIELD, [1])
-    queue_command(0.0, Opcodes.MIKU_DISP, [0, 0])  # Index 0, Hidden
-
-
-    if has_song:
-        queue_command(song_play_time, Opcodes.MUSIC_PLAY, [])
-    if has_movie:
-        queue_command(movie_play_time, Opcodes.MOVIE_PLAY, [1])
-        queue_command(movie_play_time, Opcodes.MOVIE_DISP, [1])
-
-    last_flying_time = -1
-    last_processed_time = 0.0
-    min_gap = 0.0001
-
-    for target in chart["targets"]:
-        target_tick = target.get("Tick", 0)
-        raw_seconds = calculate_time_seconds(target_tick, tpb, tempo_map)
-        target_seconds = max(0.0, raw_seconds - delay_offset)
-
-        if 0.0 < (target_seconds - last_processed_time) <= min_gap:
-            target_seconds = last_processed_time + min_gap
-        last_processed_time = target_seconds
-
-        flying_time_ms = 1500
-        if flying_time_ms != last_flying_time:
-            queue_command(target_seconds, Opcodes.TARGET_FLYING_TIME, [flying_time_ms])
-            last_flying_time = flying_time_ms
-
-        pos_x, pos_y = target.get("Position", (0.0, 0.0))
-        angle = target.get("Angle", 0.0)
-        distance = target.get("Distance", 0.0)
-        amplitude = target.get("Amplitude", 0.0)
-        frequency = target.get("Frequency", 0.0)
-
-        target_params = [
-            get_target_type_enum(target),
-            int(pos_x * 250.0),
-            int(pos_y * 250.0),
-            int(angle * 1000.0),
-            int(distance * 250.0),
-            int(amplitude),
-            int(frequency)
-        ]
-        queue_command(target_seconds, Opcodes.TARGET, target_params)
-
-    duration_seconds = time_data.get("Duration", 0.0) + delay_offset
-    queue_command(duration_seconds, Opcodes.PV_END, [])
-
-    binary_data = bytearray(struct.pack('<I', 0x14050921))
-
-    for time_point in sorted(timeline.keys()):
-        binary_data.extend(struct.pack('<Ii', Opcodes.TIME, time_point))
-
-        for opcode, params in timeline[time_point]:
-            binary_data.extend(struct.pack('<I', opcode))
-            for p in params:
-                binary_data.extend(struct.pack('<i', p))
-
-    binary_data.extend(struct.pack('<I', Opcodes.END))
-
-    with open(output_filepath, 'wb') as f:
-        f.write(binary_data)
-
-    print(f"Successfully serialized valid binary PVScript to: {output_filepath}")
 
 def flying_time_to_beats(flying_time_percent):
     """Gets amount of beats it takes for note to fly in"""
@@ -1071,6 +978,100 @@ class CsfmParser:
         ]
         return recent_targets
 
+    def export_dsc(self, output_filepath, has_song=True, has_movie=True):
+
+        # TODO Needs fixing offset adjustment. Currently it breaks charts that export properly in Comfy Studio
+
+        chart = self.chart
+        time_data = chart[ChartProperties.Time.value]
+        tpb = chart[ChartProperties.Scale.value][ScaleProperties.TicksPerBeat.value]
+        tempo_map = chart[ChartProperties.TempoMap.value]
+
+        timeline = defaultdict(list)
+
+        def queue_command(seconds, opcode, params=[]):
+            time_point = int(seconds * 100000.0)
+            timeline[time_point].append((opcode, params))
+
+        song_offset = abs(time_data.get(ChartTimeProperties.SongOffset.value)) if has_song else 0.0
+        movie_offset = abs(time_data.get(ChartTimeProperties.MovieOffset.value)) if has_movie else 0.0
+
+        delay_offset = max(song_offset, movie_offset, 0.0)
+
+        song_play_time = song_offset  # it needs to factor in delay_offset
+        movie_play_time = movie_offset  # it needs to factor in delay_offset
+
+        print(song_offset)
+        print(movie_offset)
+
+        print(delay_offset)
+
+        print(song_play_time)
+        print(movie_play_time)
+
+        queue_command(0.0, Opcodes.CHANGE_FIELD, [1])
+        queue_command(0.0, Opcodes.MIKU_DISP, [0, 0])
+
+        if has_song:
+            queue_command(song_play_time, Opcodes.MUSIC_PLAY, [])
+        if has_movie:
+            queue_command(movie_play_time, Opcodes.MOVIE_PLAY, [1])
+            queue_command(movie_play_time, Opcodes.MOVIE_DISP, [1])
+
+        last_flying_time = -1
+        last_processed_time = 0.0
+        min_gap = 0.0001
+
+        for target in chart[ChartProperties.Targets.value]:
+            target_tick = target.get(TargetProperties.Tick.value, 0)
+            raw_seconds = calculate_time_seconds(target_tick, tpb, tempo_map)
+            target_seconds = max(0.0, raw_seconds - delay_offset)
+
+            if 0.0 < (target_seconds - last_processed_time) <= min_gap:
+                target_seconds = last_processed_time + min_gap
+            last_processed_time = target_seconds
+
+            flying_time_ms = 1500
+            if flying_time_ms != last_flying_time:
+                queue_command(target_seconds, Opcodes.TARGET_FLYING_TIME, [flying_time_ms])
+                last_flying_time = flying_time_ms
+
+            pos_x, pos_y = target.get(TargetProperties.Position.value, (0.0, 0.0))
+            angle = target.get(TargetProperties.Angle.value, 0.0)
+            distance = target.get(TargetProperties.Distance.value, 0.0)
+            amplitude = target.get(TargetProperties.Amplitude.value, 0.0)
+            frequency = target.get(TargetProperties.Frequency.value, 0.0)
+
+            target_params = [
+                get_target_type_enum(target).value,
+                int(pos_x * 250.0),
+                int(pos_y * 250.0),
+                int(angle * 1000.0),
+                int(distance * 250.0),
+                int(amplitude),
+                int(frequency)
+            ]
+            queue_command(target_seconds, Opcodes.TARGET, target_params)
+
+        duration_seconds = time_data.get(ChartTimeProperties.Duration.value, 0.0) + delay_offset
+        queue_command(duration_seconds, Opcodes.PV_END, [])
+
+        binary_data = bytearray(struct.pack('<I', 0x14050921))
+
+        for time_point in sorted(timeline.keys()):
+            binary_data.extend(struct.pack('<Ii', Opcodes.TIME.value, time_point))
+
+            for opcode, params in timeline[time_point]:
+                binary_data.extend(struct.pack('<I', opcode.value))
+                for p in params:
+                    binary_data.extend(struct.pack('<i', p))
+
+        binary_data.extend(struct.pack('<I', Opcodes.END.value))
+
+        with open(output_filepath, 'wb') as f:
+            f.write(binary_data)
+
+        print(f"DSC exported to: {output_filepath}")
 
     def scan_csfm(self,file,precision:TargetSpawnPrecision):
         note_spawn_precision = precision
