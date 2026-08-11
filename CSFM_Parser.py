@@ -2,6 +2,7 @@ import os
 import struct
 import math
 from collections import defaultdict
+from datetime import timedelta
 from enum import Enum, auto
 
 
@@ -151,8 +152,8 @@ class TempoMapEntry(Enum):
     BPM = auto()
     FlyingTime = auto()
 class TargetSpawnPrecision(Enum):
-    Normal = auto()
     Strict = auto()
+    Normal = auto()
 
 class NoteCheck(Enum):
     NOTE_SPAWN_ON_SCREEN =                              "Note Spawn Issue","Note spawns on screen"
@@ -987,27 +988,41 @@ class CsfmParser:
         tpb = chart[ChartProperties.Scale.value][ScaleProperties.TicksPerBeat.value]
         tempo_map = chart[ChartProperties.TempoMap.value]
 
-        timeline = defaultdict(list)
+        script_command_list = defaultdict(list)
 
         def queue_command(seconds, opcode, params=[]):
             time_point = int(seconds * 100000.0)
-            timeline[time_point].append((opcode, params))
+            script_command_list[time_point].append((opcode, params))
+
+
+        print(time_data.get(ChartTimeProperties.SongOffset.value))
+        print(time_data.get(ChartTimeProperties.MovieOffset.value))
 
         song_offset = abs(time_data.get(ChartTimeProperties.SongOffset.value)) if has_song else 0.0
         movie_offset = abs(time_data.get(ChartTimeProperties.MovieOffset.value)) if has_movie else 0.0
 
-        delay_offset = max(song_offset, movie_offset, 0.0)
+        song_play_time = (min(-song_offset,0.0))
+        movie_play_time = (min(-movie_offset,0.0))
 
-        song_play_time = song_offset  # it needs to factor in delay_offset
-        movie_play_time = movie_offset  # it needs to factor in delay_offset
 
-        print(song_offset)
-        print(movie_offset)
+
+
+        delay_offset = max(max(song_offset,movie_offset),0.0)
+
 
         print(delay_offset)
+        print(f"Before adjustment: {song_play_time}")
+        print(f"Before adjustment: {movie_play_time}")
 
-        print(song_play_time)
-        print(movie_play_time)
+        if song_offset > 0.0 or movie_offset >= 0.0:
+            if song_offset > movie_offset:
+                movie_play_time += abs(song_offset)
+            elif movie_offset > song_offset:
+                song_play_time += abs(movie_offset)
+
+
+        print(f"After adjustment: {song_play_time}")
+        print(f"After adjustment: {movie_play_time}")
 
         queue_command(0.0, Opcodes.CHANGE_FIELD, [1])
         queue_command(0.0, Opcodes.MIKU_DISP, [0, 0])
@@ -1058,10 +1073,10 @@ class CsfmParser:
 
         binary_data = bytearray(struct.pack('<I', 0x14050921))
 
-        for time_point in sorted(timeline.keys()):
+        for time_point in sorted(script_command_list.keys()):
             binary_data.extend(struct.pack('<Ii', Opcodes.TIME.value, time_point))
 
-            for opcode, params in timeline[time_point]:
+            for opcode, params in script_command_list[time_point]:
                 binary_data.extend(struct.pack('<I', opcode.value))
                 for p in params:
                     binary_data.extend(struct.pack('<i', p))
@@ -1122,7 +1137,7 @@ class CsfmParser:
 
         for multi_note in self.get_multi_note_list():
             if multi_check_distance(multi_note,880):
-                issues_list.append(ChartIssue(IssueLevel.Error, NoteCheck.STYLE_MULTI_880_DISTANCE, multi_note, self))
+                issues_list.append(ChartIssue(IssueLevel.Info, NoteCheck.STYLE_MULTI_880_DISTANCE, multi_note, self))
 
             if len(multi_note) > 4:
                 issues_list.append(ChartIssue(IssueLevel.Error, NoteCheck.MULTI_TYPE_MORE_THAN_4, multi_note, self))
