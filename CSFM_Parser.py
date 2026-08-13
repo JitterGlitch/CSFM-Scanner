@@ -899,6 +899,7 @@ class CsfmParser:
         target_list = self.get_target_list()
 
         previous_tick = -1
+        grouped_note_list = []
         multi_note_list = []
         temp_group = []
         for target in target_list:
@@ -906,17 +907,17 @@ class CsfmParser:
                 temp_group.append(target)
             else:
                 if temp_group:
-                    multi_note_list.append(temp_group)
+                    grouped_note_list.append(temp_group)
                 temp_group = []
                 previous_tick = target[TargetProperties.Tick.value]
                 temp_group.append(target)
 
         if temp_group:
-            multi_note_list.append(temp_group)
+            grouped_note_list.append(temp_group)
 
-        for entry in multi_note_list:
-            if len(entry) == 1:
-                multi_note_list.remove(entry)
+        for entry in grouped_note_list:
+            if len(entry) > 1:
+                multi_note_list.append(entry)
 
         return multi_note_list
 
