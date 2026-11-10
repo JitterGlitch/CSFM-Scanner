@@ -35,6 +35,9 @@ jobs:
           pip install -r ./requirements.txt
         shell: bash
 
+      - name: Generate and compile QRC
+        run: |
+          python generate_resources.py Images --prefix resources
 
       - name: Build with PyInstaller
         run: |

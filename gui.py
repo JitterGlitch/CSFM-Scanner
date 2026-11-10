@@ -1,13 +1,43 @@
 import sys
+from collections import defaultdict
+
+import resources_rc
 from pathlib import Path
 
-from PySide6.QtGui import QColor
-
 from ui_main_window import Ui_MainWindow
-from PySide6.QtCore import Qt, QThread, Signal, QTimer, QFileSystemWatcher
-from PySide6.QtWidgets import QMainWindow, QApplication, QVBoxLayout, QPushButton, QListView, QWidget, QFileDialog, QListWidgetItem
-from CSFM_Parser import CsfmParser, DifficultyOutput, NoteCheck, ChartIssue, TargetProperties, IssueLevel, NoteCheckOnScreenReason
+from PySide6.QtCore import Qt, QThread, Signal, QTimer, QFileSystemWatcher, QByteArray, QBuffer
+from PySide6.QtWidgets import QMainWindow, QApplication, QVBoxLayout, QPushButton, QListView, QWidget, QFileDialog, QListWidgetItem, QTreeWidgetItem, QHBoxLayout, QLabel
+from CSFM_Parser import CsfmParser, DifficultyOutput, NoteCheck, ChartIssue, TargetProperties, IssueLevel, NoteCheckOnScreenReason, TargetTypes, Note
 
+
+def target_list_to_rich_text_list(target_list):
+    rich_text_list = []
+    #TODO: Labels support images via rich-text.
+    # Use that instead
+
+    for target in target_list:
+        base_note = TargetTypes.get_base_note(target)
+        match base_note:
+            case TargetTypes.Triangle:
+                note_image = u":resources/Images/Notes/Triangle.png"
+            case TargetTypes.Circle:
+                note_image = u":resources/Images/Notes/Circle.png"
+            case TargetTypes.Cross:
+                note_image = u":resources/Images/Notes/Cross.png"
+            case TargetTypes.Square:
+                note_image = u":resources/Images/Notes/Square.png"
+            # case TargetTypes.SlideL:
+            #     note_image = u":resources/Images/Notes/SlideL.png"
+            # case TargetTypes.SlideR:
+            #     note_image = u":resources/Images/Notes/SlideR.png"
+            case _:
+                note_image = u":resources/Images/Notes/Circle.png"
+
+
+        note_image_string =f'<img src={note_image} width="15" height="15" style="vertical-align: middle;">'
+        rich_text_list.append(note_image_string)
+
+    return rich_text_list
 
 class MainWindow(QMainWindow):
     FilterChanged = Signal()
@@ -52,7 +82,7 @@ class MainWindow(QMainWindow):
 
 
         self.currently_loaded_csfm = csfm_location
-        self.main_box.csfm_issues_listview.clear()
+        self.main_box.csfm_issues_treeview.clear()
 
         self.issues = self.parser.scan_csfm(csfm_location)
         self.issues = sorted(self.issues,key=lambda issue: issue.timestamp)
@@ -64,7 +94,7 @@ class MainWindow(QMainWindow):
         self.display_issues()
 
     def get_issue_description(self,issue: ChartIssue):
-        timestamp = issue.chart.get_time_from_tick(issue.timestamp)
+        timestamp = issue.timestamp
         note_type = issue.get_note_type_string()
         target_type = issue.get_target().get_type()
         precision = self.main_box.target_spawn_precision_combobox.currentEnum().name
@@ -77,13 +107,13 @@ class MainWindow(QMainWindow):
             case NoteCheck.NOTE_SPAWN_ON_SCREEN:
                 match issue.extra_info["Reason"]:
                     case NoteCheckOnScreenReason.ON_SCREEN:
-                        return f"At {timestamp} {target_type} spawns on screen"
+                        return f"{target_type.name} spawns on screen"
                     case NoteCheckOnScreenReason.DIFFERENT_TYPE:
-                        return f"At {timestamp} {target_type} spawns from note of different type {issue.extra_info["Spawn Source"].get_type()}"
+                        return f"{target_type.name} spawns from note of different type {issue.extra_info["Spawn Source"].get_type().name}"
                     case NoteCheckOnScreenReason.SAME_TYPE:
-                        return f"At {timestamp} {target_type} spawns from note of same type"
+                        return f"{target_type.name} spawns from note of same type"
                     case NoteCheckOnScreenReason.ITSELF:
-                        return f"At {timestamp} {target_type} spawns from itself"
+                        return f"{target_type.name} spawns from itself"
                     case _:
                         return f"Note spawn check returned Error"
             case NoteCheck.NOTE_PHANTOM:
@@ -92,23 +122,41 @@ class MainWindow(QMainWindow):
                 return f"At {timestamp} {note_type} uses default placements"
             case _:
                 return f"At {timestamp} unimplemented error description"
+
+    def build_issue_data_tree(self,chart_issues_list:list[ChartIssue]):
+        grouped = defaultdict(list)
+        for issue in chart_issues_list:
+            grouped[issue.timestamp].append(issue)
+        return dict(grouped)
+
+
+
     def display_issues(self):
-        self.main_box.csfm_issues_listview.clear()
-        print(self.filter_dict)
-        for issue in self.issues:
-            if self.filter_dict[issue.type.name] == 2:
-                issue_string = self.get_issue_description(issue)
-                issue_obj = QListWidgetItem(issue_string,self.main_box.csfm_issues_listview)
-                # if issue.level == IssueLevel.Error:
-                #     issue_obj.setBackground(QColor(32+150,32+110,36+110,50))
-            if not self.issues:
-                issue_obj = QListWidgetItem("No issues detected",self.main_box.csfm_issues_listview)
+        self.main_box.csfm_issues_treeview.clear()
 
+        grouped_issues = self.build_issue_data_tree(self.issues)
 
+        for timestamp,issue in grouped_issues.items():
+            issue_item = QTreeWidgetItem([str(timestamp)])
+            target_list = issue[0].note.get_type()
+            note_image_list = target_list_to_rich_text_list(target_list)
+            note_string = ""
+            for note in note_image_list:
+                note_string = note_string + note
 
+            label = QLabel(note_string)
+            label.setTextFormat(Qt.TextFormat.RichText)
 
+            self.main_box.csfm_issues_treeview.addTopLevelItem(issue_item)
+            self.main_box.csfm_issues_treeview.setItemWidget(issue_item,1, label)
 
+            for i in issue:
+                leaf = QTreeWidgetItem(
+                    [self.get_issue_description(i)]
+                )
+                issue_item.addChild(leaf)
 
+            self.main_box.csfm_issues_treeview.expandAll()
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setStyle("Fusion")

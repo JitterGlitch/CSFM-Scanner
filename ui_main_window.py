@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (QAbstractScrollArea, QComboBox,
                                QDoubleSpinBox, QFrame, QGridLayout, QHBoxLayout,
                                QLabel, QLayout, QPushButton,
                                QScrollArea, QSizePolicy, QSpacerItem, QStackedWidget,
-                               QTabWidget, QVBoxLayout, QWidget, QMenuBar, QListWidget, QStatusBar, QListWidgetItem)
+                               QTabWidget, QVBoxLayout, QWidget, QMenuBar, QListWidget, QStatusBar, QListWidgetItem, QTreeWidget)
 from superqt import QEnumComboBox
 
 from CSFM_Parser import NoteCheck, TargetSpawnPrecision
@@ -117,12 +117,14 @@ class Ui_MainWindow(object):
         self.button = QPushButton()
         self.button.setText("Load CSFM")
 
-        self.csfm_issues_listview = QListWidget()
-        self.csfm_issues_listview.setMinimumWidth(600)
+        self.csfm_issues_treeview = QTreeWidget()
+        self.csfm_issues_treeview.setMinimumWidth(600)
+        self.csfm_issues_treeview.setHeaderLabels(["Timestamp","Note"])
+        self.csfm_issues_treeview.setSortingEnabled(True)
 
         self.layout.addWidget(self.button)
         self.layout.addLayout(self.info_layout)
-        self.layout.addWidget(self.csfm_issues_listview)
+        self.layout.addWidget(self.csfm_issues_treeview)
 
         self.main_hbox_layout = QHBoxLayout(self.centralwidget)
         self.main_hbox_layout.addLayout(self.layout)

@@ -40,6 +40,36 @@ class TargetTypes(Enum):
     SquareChance = 21
     SlideLChance = 23
     SlideRChance = 24
+
+    @classmethod
+    def get_base_note(cls,note):
+        triangle = (cls.Triangle,cls.TriangleHold,cls.TriangleChance)
+        circle = (cls.Circle,cls.CircleHold,cls.CircleChance)
+        cross = (cls.Cross,cls.CrossHold,cls.CrossChance)
+        square = (cls.Square,cls.SquareHold,cls.SquareChance)
+        slideL = (cls.SlideL,cls.SlideLChance)
+        slideR = (cls.SlideR,cls.SlideRChance)
+
+        if note in triangle:
+            return TargetTypes.Triangle
+        if note in circle:
+            return TargetTypes.Circle
+        if note in cross:
+            return TargetTypes.Cross
+        if note in square:
+            return TargetTypes.Square
+        if note in slideL:
+            return TargetTypes.SlideL
+        if note in slideR:
+            return TargetTypes.SlideR
+        if note == TargetTypes.SlideChainL:
+            return TargetTypes.SlideChainL
+        if note == TargetTypes.SlideChainR:
+            return TargetTypes.SlideChainR
+
+        return TargetTypes.Circle
+
+
 class ChartProperties(Enum):
     Scale = "scale"
     Time = "time"
@@ -193,13 +223,13 @@ class IssueLevel(Enum):
     ImportantWarning = auto()
     Error = auto()
 class ChartIssue:
-    def __init__(self,note_check:NoteCheck,note:Note,target=None,extra_info_dict:dict=None):
+    def __init__(self,note_check:NoteCheck,note:Note,timestamp,target=None,extra_info_dict:dict=None):
         self.type = note_check
         self.note = note
         self.chart = note.chart
         self.target = target
         self.note_type = note.get_type()
-        self.timestamp = note.get_tick()
+        self.timestamp = timestamp
 
         self.extra_info = extra_info_dict
 
@@ -347,7 +377,13 @@ class Target:
         return results_dict
     def _get_spawn_source(self, point):
         timestamp = self.chart.get_flying_time_at_tick(self.tick - 1)
-        first_note = self.chart.get_note_section(self.tick, flying_time_to_beats(timestamp))[0]
+        section = self.chart.get_note_section(self.tick, flying_time_to_beats(timestamp))
+
+        if section:
+            first_note = section[0]
+        else:
+            return None
+
         section_positions = filter_target_properties(first_note.get_targets(), "position")
 
         if not position_check_with_tolerance(point, section_positions):
@@ -1079,7 +1115,7 @@ class CsfmParser:
 
         print(f"DSC exported to: {output_filepath}")
 
-    def scan_csfm(self,file):
+    def scan_csfm(self,file) -> list[ChartIssue]:
         self.parse(file)
 
         print(self.get_song_name())
@@ -1096,7 +1132,8 @@ class CsfmParser:
                 for note_check in NoteCheck.get_target_checks():
                     check_info = target.run_check(note_check)
                     if any(check_info["Result"].values()):
-                         issues_list.append(ChartIssue(note_check,note,target,check_info))
+                        timestamp = self.get_time_from_tick(target.tick)
+                        issues_list.append(ChartIssue(note_check,note,timestamp,target,check_info))
 
         return issues_list
     def scan_folder(self,folder):
