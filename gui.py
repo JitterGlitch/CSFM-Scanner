@@ -6,45 +6,7 @@ from PySide6.QtGui import QColor
 from ui_main_window import Ui_MainWindow
 from PySide6.QtCore import Qt, QThread, Signal, QTimer, QFileSystemWatcher
 from PySide6.QtWidgets import QMainWindow, QApplication, QVBoxLayout, QPushButton, QListView, QWidget, QFileDialog, QListWidgetItem
-from CSFM_Parser import CsfmParser, DifficultyOutput, NoteCheck, ChartIssue, TargetProperties, IssueLevel
-
-def get_issue_description(issue:ChartIssue):
-    timestamp = issue.parser.get_time_from_tick(issue.timestamp)
-    issue_level = issue.level.name
-    note_type = issue.note_type
-
-    spawn_position = "Unfilled"
-
-    if issue.extra_info:
-        spawn_position = issue.extra_info["Note Spawn Position"]
-
-
-    match issue.type:
-        case NoteCheck.NOTE_SPAWN_ON_SCREEN:
-            return f"{issue_level} - At {timestamp} {note_type} spawns on screen. Exact spawn position {spawn_position}"
-        case NoteCheck.NOTE_SPAWN_FROM_OTHER:
-            different_note_type = issue.extra_info["Other Note Type"]
-            return f"{issue_level} - At {timestamp} {note_type} spawns from {different_note_type}. Exact spawn position {spawn_position}"
-        case NoteCheck.NOTE_SPAWN_FROM_SAME:
-            return f"{issue_level} - At {timestamp} {note_type} spawns from same note type. Exact spawn position {spawn_position}"
-        case NoteCheck.NOTE_SPAWN_0_DISTANCE:
-            return f"{issue_level} - At {timestamp} {note_type} is a Phantom Note"
-        case NoteCheck.NOTE_PLACEMENT_OUTSIDE_GRID:
-            return f"{issue_level} - At {timestamp} {note_type} is outside of the grid"
-        case NoteCheck.MULTI_TYPE_MORE_THAN_4:
-            return f"{issue_level} - At {timestamp} {note_type} contains more than 4 notes. THIS WILL CAUSE GAME TO CRASH"
-        case NoteCheck.STYLE_MULTI_880_DISTANCE:
-            return f"{issue_level} - At {timestamp} {note_type} has 880 distance or lower"
-        case NoteCheck.STYLE_DISTANCE_TOO_HIGH:
-            return f"{issue_level} - At {timestamp} {note_type} has too high distance"
-        case NoteCheck.STYLE_AMPLITUDE_TOO_HIGH:
-            return f"{issue_level} - At {timestamp} {note_type} has too high amplitude"
-        case NoteCheck.STYLE_FREQUENCY_TOO_HIGH:
-            return f"{issue_level} - At {timestamp} {note_type} has too high frequency"
-        case NoteCheck.NEWBIE_UNSET_NOTE:
-            return f"{issue_level} - At {timestamp} {note_type} has placeholder placements"
-        case _:
-            return f"At {timestamp} unimplemented error description"
+from CSFM_Parser import CsfmParser, DifficultyOutput, NoteCheck, ChartIssue, TargetProperties, IssueLevel, NoteCheckOnScreenReason
 
 
 class MainWindow(QMainWindow):
@@ -64,6 +26,8 @@ class MainWindow(QMainWindow):
         self.watcher.fileChanged.connect(self.watcher_update)
         self.currently_loaded_csfm = None
 
+        self.load_csfm("/home/jitterglitch/PycharmProjects/CSFM-Helper/Test Data/JitterGlitch Chart Pack/FOMENT - 7 HD.csfm")
+
     def watcher_update(self,path):
         print("running")
         for path in self.watcher.files():
@@ -79,37 +43,64 @@ class MainWindow(QMainWindow):
             csfm_location = QFileDialog.getOpenFileName(self,
                                                          f"Open CSFM",
                                                          None,
-                                                         "*.csfm")
-
+                                                         "*.csfm")[0]
             if csfm_location == "":
                 print("User didn't select image")
                 return
 
-            self.watcher.addPath(str(csfm_location[0]))
+            self.watcher.addPath(str(csfm_location))
 
 
         self.currently_loaded_csfm = csfm_location
         self.main_box.csfm_issues_listview.clear()
 
-        self.issues = self.parser.scan_csfm(csfm_location[0],self.main_box.target_spawn_precision_combobox.currentEnum())
+        self.issues = self.parser.scan_csfm(csfm_location)
         self.issues = sorted(self.issues,key=lambda issue: issue.timestamp)
 
-        self.main_box.csfm_file_label.setText(Path(csfm_location[0]).name)
+        self.main_box.csfm_file_label.setText(Path(csfm_location).name)
         self.main_box.csfm_song_name_label.setText(self.parser.get_song_name())
         self.main_box.csfm_difficulty_label.setText(self.parser.get_difficulty())
 
         self.display_issues()
 
+    def get_issue_description(self,issue: ChartIssue):
+        timestamp = issue.chart.get_time_from_tick(issue.timestamp)
+        note_type = issue.get_note_type_string()
+        target_type = issue.get_target().get_type()
+        precision = self.main_box.target_spawn_precision_combobox.currentEnum().name
 
+        print(timestamp)
+        print(issue.extra_info)
+
+        match issue.type:
+
+            case NoteCheck.NOTE_SPAWN_ON_SCREEN:
+                match issue.extra_info["Reason"]:
+                    case NoteCheckOnScreenReason.ON_SCREEN:
+                        return f"At {timestamp} {target_type} spawns on screen"
+                    case NoteCheckOnScreenReason.DIFFERENT_TYPE:
+                        return f"At {timestamp} {target_type} spawns from note of different type {issue.extra_info["Spawn Source"].get_type()}"
+                    case NoteCheckOnScreenReason.SAME_TYPE:
+                        return f"At {timestamp} {target_type} spawns from note of same type"
+                    case NoteCheckOnScreenReason.ITSELF:
+                        return f"At {timestamp} {target_type} spawns from itself"
+                    case _:
+                        return f"Note spawn check returned Error"
+            case NoteCheck.NOTE_PHANTOM:
+                return f"At {timestamp} {note_type} has 0 Distance"
+            case NoteCheck.NEWBIE_UNSET_NOTE:
+                return f"At {timestamp} {note_type} uses default placements"
+            case _:
+                return f"At {timestamp} unimplemented error description"
     def display_issues(self):
         self.main_box.csfm_issues_listview.clear()
         print(self.filter_dict)
         for issue in self.issues:
             if self.filter_dict[issue.type.name] == 2:
-                issue_string = get_issue_description(issue)
+                issue_string = self.get_issue_description(issue)
                 issue_obj = QListWidgetItem(issue_string,self.main_box.csfm_issues_listview)
-                if issue.level == IssueLevel.Error:
-                    issue_obj.setBackground(QColor(32+150,32+110,36+110,50))
+                # if issue.level == IssueLevel.Error:
+                #     issue_obj.setBackground(QColor(32+150,32+110,36+110,50))
             if not self.issues:
                 issue_obj = QListWidgetItem("No issues detected",self.main_box.csfm_issues_listview)
 
