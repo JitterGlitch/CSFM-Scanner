@@ -4,6 +4,7 @@ import math
 from collections import defaultdict
 from datetime import timedelta
 from enum import Enum, auto
+from typing_extensions import NamedTuple
 
 
 class Opcodes(Enum):
@@ -174,23 +175,19 @@ class TargetSpawnPrecision(Enum):
     Strict = auto()
     Normal = auto()
 
-class NoteCheck(Enum):
-    NOTE_SPAWN_ON_SCREEN =                              "Note Spawn Issue","Note spawns on screen"
-    NOTE_SPAWN_FROM_OTHER =                             "Note Spawn Issue","Note spawns from other note"
-    NOTE_SPAWN_FROM_SAME =                              "Note Spawn Issue","Note spawns from same note"
-    NOTE_PHANTOM =                                      "Note Spawn Issue","Note with 0 distance"
+class Check(Enum):
+    TARGET_SPAWN_ON_SCREEN =                              "Note Spawn Issue","Note spawns on screen"
+    TARGET_PHANTOM =                                      "Note Spawn Issue","Note with 0 distance"
+    TARGET_PROP_NOT_SET =                                 "New Charter Issue","Note has placeholder placements"
+    TARGET_INSIDE_GRID =                                  "Note Placement Issue","Note placed outside of the grid"
 
-    NOTE_PLACEMENT_OUTSIDE_GRID =                       "Note Placement Issue","Note placed outside of the grid"
+    NOTE_MULTI_TYPE_MORE_THAN_4 =                         "Multi-Note Type Issue","Multi-Note has more than 4 notes"
+    NOTE_MULTI_880_DISTANCE =                             "Style Issue","Multi-Note uses 880 or less distance"
 
-    MULTI_TYPE_MORE_THAN_4 =                            "Multi-Note Type Issue","Multi-Note has more than 4 notes"
-
-    STYLE_MULTI_880_DISTANCE =                          "Style Issue","Multi-Note uses 880 or less distance"
-
-    NEWBIE_UNSET_NOTE =                                 "New Charter Issue","Note has placeholder placements"
     def __new__(cls, category: str, description: str):
         obj = object.__new__(cls)
-        obj._value_ = description
         obj.category = category
+        obj._value_ = description
         return obj
 
     @classmethod
@@ -203,19 +200,21 @@ class NoteCheck(Enum):
 
     @classmethod
     def get_target_checks(cls):
-        group = [
-        cls.NOTE_SPAWN_ON_SCREEN,
-        #cls.NOTE_SPAWN_FROM_OTHER,
-        #cls.NOTE_SPAWN_FROM_SAME,
-        #cls.NOTE_SPAWN_0_DISTANCE,
-        ]
+        group = []
+        for check in Check:
+            if check.name.startswith("TARGET"):
+                group.append(check)
         return group
 
-class NoteCheckOnScreenReason(Enum):
+class TargetCheckOnScreenReason(Enum):
     ON_SCREEN = "Note spawns on screen"
     ITSELF = "Note spawns from itself"
     SAME_TYPE = "Note spawns from note of same type"
     DIFFERENT_TYPE = "Note spawns from note of different type"
+class TargetCheckInsideGrid(Enum):
+    INSIDE = "Note is placed inside the grid"
+    EDGE = "Note is placed on edge of the grid"
+    OUTSIDE = "Note is placed outside of the grid"
 
 class IssueLevel(Enum):
     Info = auto()
@@ -223,8 +222,8 @@ class IssueLevel(Enum):
     ImportantWarning = auto()
     Error = auto()
 class ChartIssue:
-    def __init__(self,note_check:NoteCheck,note:Note,timestamp,target=None,extra_info_dict:dict=None):
-        self.type = note_check
+    def __init__(self,check:Check,note:Note,timestamp,target=None,extra_info_dict:dict=None):
+        self.type = check
         self.note = note
         self.chart = note.chart
         self.target = target
@@ -241,6 +240,10 @@ class ChartIssue:
         return note_name_list
     def get_target(self):
         return self.target
+
+class Point(NamedTuple):
+    x: float
+    y: float
 
 
 def calculate_time_seconds(tick, ticks_per_beat, tempo_map):
@@ -276,14 +279,6 @@ def flying_time_to_beats(flying_time_percent):
         return 4.0
 
 #### Note Checks ####
-def check_if_point_in_grid(position):
-
-    x = position[0]
-    y = position[1]
-
-    x_min, y_min, x_max, y_max = 96, 192, 1824, 864
-
-    return x_min <= x <= x_max and y_min <= y <= y_max
 def position_check_with_tolerance(position, last_section_positions, precision=5.0):
     #Ideally autistic precision of 1 would be used,
     # that however is overkill for faster songs where it's hard to spot misalignment
@@ -324,7 +319,8 @@ class Target:
         self.is_hold = bool(target_properties["Hold"])
         self.is_chain = bool(target_properties["Chain"])
         self.is_chance = bool(target_properties["Chance"])
-        self.position = target_properties["Position"]
+        pos = target_properties["Position"]
+        self.position = Point(pos[0],pos[1])
         self.angle = target_properties["Angle"]
         self.frequency = target_properties["Frequency"]
         self.distance = target_properties["Distance"]
@@ -355,6 +351,10 @@ class Target:
         dy = self.distance * math.sin(angle_rad)
 
         return x + dx, y + dy
+    def get_position(self):
+        if not self.has_set_properties:
+            return None
+        return self.position
 
     def _check_if_point_in_visible_area(self,position):
         results_dict = dict()
@@ -375,6 +375,12 @@ class Target:
             })
 
         return results_dict
+
+    def _check_if_point_in_grid(self,point):
+        x_min, y_min, x_max, y_max = 96, 192, 1824, 864
+
+        return x_min <= point.x <= x_max and y_min <= point.y <= y_max
+
     def _get_spawn_source(self, point):
         timestamp = self.chart.get_flying_time_at_tick(self.tick - 1)
         section = self.chart.get_note_section(self.tick, flying_time_to_beats(timestamp))
@@ -401,14 +407,16 @@ class Target:
 
         return None
 
-    def run_check(self,check:NoteCheck):
+    def run_check(self,check:Check):
         check_info = dict()
+        check_info.update({"Result": False})
         match check:
-            case NoteCheck.NEWBIE_UNSET_NOTE:
+            case Check.TARGET_PROP_NOT_SET:
                 check_result = not bool(self.has_set_properties)
                 check_info.update({"Result": check_result})
+                return check_info
 
-            case NoteCheck.NOTE_SPAWN_ON_SCREEN:
+            case Check.TARGET_SPAWN_ON_SCREEN:
                 point = round_position(self.get_spawn_point())
                 on_screen_result = self._check_if_point_in_visible_area(point)
 
@@ -423,27 +431,46 @@ class Target:
 
                     match spawn_source:
                         case None:
-                            check_info["Reason"] = NoteCheckOnScreenReason.ON_SCREEN
+                            check_info["Reason"] = TargetCheckOnScreenReason.ON_SCREEN
                         case Target():
                             target = spawn_source
                             if target.get_type() == self.get_type():
                                 if target.position == self.position:
-                                    check_info["Reason"] = NoteCheckOnScreenReason.ITSELF
+                                    check_info["Reason"] = TargetCheckOnScreenReason.ITSELF
                                 else:
-                                    check_info["Reason"] = NoteCheckOnScreenReason.SAME_TYPE
+                                    check_info["Reason"] = TargetCheckOnScreenReason.SAME_TYPE
                             else:
-                                check_info["Reason"] = NoteCheckOnScreenReason.DIFFERENT_TYPE
+                                check_info["Reason"] = TargetCheckOnScreenReason.DIFFERENT_TYPE
 
                 return check_info
 
-            case NoteCheck.NOTE_PHANTOM:
+            case Check.TARGET_PHANTOM:
                 check_result = self.distance == 0
                 check_info.update({"Result": check_result})
+                return check_info
+            case Check.TARGET_INSIDE_GRID:
+                point = self.get_position()
+                if point is None:
+                    return check_info
+
+                if point.x in (96, 1824):
+                    check_info.update({"Result": True,
+                                       "Reason": TargetCheckInsideGrid.EDGE})
+                if point.y in (192, 864):
+                    check_info.update({"Result": True,
+                                       "Reason": TargetCheckInsideGrid.EDGE})
+
+                if not self._check_if_point_in_grid(point):
+
+                    check_info.update({"Result": True,
+                                       "Reason": TargetCheckInsideGrid.OUTSIDE})
+
+
+                return check_info
 
 
             case _:
-                check_result = False
-                check_info.update({"Result": check_result})
+                return check_info
 class Note:
     def __init__(self, chart:CsfmParser, target_list: list[Target]):
         self.chart = chart
@@ -1021,11 +1048,14 @@ class CsfmParser:
 
         for note in note_list:
             for target in note.targets:
-                for note_check in NoteCheck.get_target_checks():
-                    check_info = target.run_check(note_check)
-                    if any(check_info["Result"].values()):
+                for check in Check.get_target_checks():
+                    check_info = target.run_check(check)
+                    result = check_info["Result"]
+                    values = result.values() if isinstance(result, dict) else [result]
+
+                    if any(values):
                         timestamp = self.get_time_from_tick(target.tick)
-                        issues_list.append(ChartIssue(note_check,note,timestamp,target,check_info))
+                        issues_list.append(ChartIssue(check,note,timestamp,target,check_info))
 
         return issues_list
     def scan_folder(self,folder):

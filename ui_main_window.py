@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (QAbstractScrollArea, QComboBox,
                                QTabWidget, QVBoxLayout, QWidget, QMenuBar, QListWidget, QStatusBar, QListWidgetItem, QTreeWidget)
 from superqt import QEnumComboBox
 
-from CSFM_Parser import NoteCheck, TargetSpawnPrecision
+from CSFM_Parser import Check, TargetSpawnPrecision
 
 
 class Ui_MainWindow(object):
@@ -65,7 +65,7 @@ class Ui_MainWindow(object):
         self.filter_scrollarea_contents.setLayout(self.filter_scrollarea_contents_layout)
         self.group_lists = []
 
-        category_list = sorted(NoteCheck.categories())
+        category_list = sorted(Check.categories())
 
         for category in category_list:
             if not category.startswith("(WIP)"):
@@ -78,7 +78,7 @@ class Ui_MainWindow(object):
                 group_listview.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
                 group_listview.itemChanged.connect(lambda sub_issue_item : self.update_dict(filter_dict,sub_issue_item))
                 self.group_lists.append(group_listview)
-                for sub_issue in NoteCheck.of_category(category):
+                for sub_issue in Check.of_category(category):
                     item = QListWidgetItem(sub_issue.value)
                     item.enum = sub_issue.name
                     item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)

@@ -7,7 +7,7 @@ from pathlib import Path
 from ui_main_window import Ui_MainWindow
 from PySide6.QtCore import Qt, QThread, Signal, QTimer, QFileSystemWatcher, QByteArray, QBuffer
 from PySide6.QtWidgets import QMainWindow, QApplication, QVBoxLayout, QPushButton, QListView, QWidget, QFileDialog, QListWidgetItem, QTreeWidgetItem, QHBoxLayout, QLabel
-from CSFM_Parser import CsfmParser, DifficultyOutput, NoteCheck, ChartIssue, TargetProperties, IssueLevel, NoteCheckOnScreenReason, TargetTypes, Note
+from CSFM_Parser import CsfmParser, DifficultyOutput, Check, ChartIssue, TargetProperties, IssueLevel, TargetCheckOnScreenReason, TargetTypes, Note, TargetCheckInsideGrid
 
 
 def target_list_to_rich_text(target_list):
@@ -98,38 +98,51 @@ class MainWindow(QMainWindow):
         self.display_issues()
 
     def get_issue_description(self,issue: ChartIssue):
-        timestamp = issue.timestamp
         note_type = issue.get_note_type_string()
         target_type = issue.get_target().get_type()
         target_icon = target_list_to_rich_text([target_type])
         precision = self.main_box.target_spawn_precision_combobox.currentEnum().name
 
-        print(timestamp)
         print(issue.extra_info)
 
         match issue.type:
 
-            case NoteCheck.NOTE_SPAWN_ON_SCREEN:
+            case Check.TARGET_SPAWN_ON_SCREEN:
                 match issue.extra_info["Reason"]:
-                    case NoteCheckOnScreenReason.ON_SCREEN:
+                    case TargetCheckOnScreenReason.ON_SCREEN:
                         return f"{target_icon} spawns on screen"
-                    case NoteCheckOnScreenReason.DIFFERENT_TYPE:
+                    case TargetCheckOnScreenReason.DIFFERENT_TYPE:
                         other_target = issue.extra_info["Spawn Source"].get_type()
                         other_target_icon = target_list_to_rich_text([other_target])
 
                         return f"{target_icon} spawns from note of different type {other_target_icon}"
-                    case NoteCheckOnScreenReason.SAME_TYPE:
+                    case TargetCheckOnScreenReason.SAME_TYPE:
                         return f"{target_icon} spawns from note of same type"
-                    case NoteCheckOnScreenReason.ITSELF:
+                    case TargetCheckOnScreenReason.ITSELF:
                         return f"{target_icon} spawns from itself"
                     case _:
-                        return f"Note spawn check returned Error"
-            case NoteCheck.NOTE_PHANTOM:
-                return f"At {timestamp} {note_type} has 0 Distance"
-            case NoteCheck.NEWBIE_UNSET_NOTE:
-                return f"At {timestamp} {note_type} uses default placements"
+                        return f"Target spawn check returned Error"
+
+            case Check.TARGET_INSIDE_GRID:
+                match issue.extra_info["Reason"]:
+                    case TargetCheckInsideGrid.INSIDE:
+                        return f"{target_icon} is placed inside the grid"
+                    case TargetCheckInsideGrid.EDGE:
+                        return f"{target_icon} is placed on edge of the grid"
+                    case TargetCheckInsideGrid.OUTSIDE:
+                        return f"{target_icon} is placed outside of the grid"
+                    case _:
+                        return f"Target inside grid check returned Error"
+
+            case Check.TARGET_PHANTOM:
+                return f"{note_type} has 0 Distance"
+
+            case Check.TARGET_PROP_NOT_SET:
+                return f"{note_type} uses default placements"
+
+
             case _:
-                return f"At {timestamp} unimplemented error description"
+                return f"Unimplemented error description"
 
     def build_issue_data_tree(self,chart_issues_list:list[ChartIssue]):
         grouped = defaultdict(list)
