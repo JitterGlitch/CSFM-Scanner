@@ -10,8 +10,8 @@ from PySide6.QtWidgets import QMainWindow, QApplication, QVBoxLayout, QPushButto
 from CSFM_Parser import CsfmParser, DifficultyOutput, NoteCheck, ChartIssue, TargetProperties, IssueLevel, NoteCheckOnScreenReason, TargetTypes, Note
 
 
-def target_list_to_rich_text_list(target_list):
-    rich_text_list = []
+def target_list_to_rich_text(target_list):
+    rich_text = ""
     #TODO: Labels support images via rich-text.
     # Use that instead
 
@@ -26,18 +26,22 @@ def target_list_to_rich_text_list(target_list):
                 note_image = u":resources/Images/Notes/Cross.png"
             case TargetTypes.Square:
                 note_image = u":resources/Images/Notes/Square.png"
-            # case TargetTypes.SlideL:
-            #     note_image = u":resources/Images/Notes/SlideL.png"
-            # case TargetTypes.SlideR:
-            #     note_image = u":resources/Images/Notes/SlideR.png"
+            case TargetTypes.SlideL:
+                note_image = u":resources/Images/Notes/SlideL.png"
+            case TargetTypes.SlideR:
+                note_image = u":resources/Images/Notes/SlideR.png"
+            case TargetTypes.SlideChainL:
+                note_image = u":resources/Images/Notes/ChainSlideL.png"
+            case TargetTypes.SlideChainR:
+                note_image = u":resources/Images/Notes/ChainSlideR.png"
             case _:
                 note_image = u":resources/Images/Notes/Circle.png"
 
 
         note_image_string =f'<img src={note_image} width="15" height="15" style="vertical-align: middle;">'
-        rich_text_list.append(note_image_string)
+        rich_text = rich_text + note_image_string
 
-    return rich_text_list
+    return rich_text
 
 class MainWindow(QMainWindow):
     FilterChanged = Signal()
@@ -97,6 +101,7 @@ class MainWindow(QMainWindow):
         timestamp = issue.timestamp
         note_type = issue.get_note_type_string()
         target_type = issue.get_target().get_type()
+        target_icon = target_list_to_rich_text([target_type])
         precision = self.main_box.target_spawn_precision_combobox.currentEnum().name
 
         print(timestamp)
@@ -107,13 +112,16 @@ class MainWindow(QMainWindow):
             case NoteCheck.NOTE_SPAWN_ON_SCREEN:
                 match issue.extra_info["Reason"]:
                     case NoteCheckOnScreenReason.ON_SCREEN:
-                        return f"{target_type.name} spawns on screen"
+                        return f"{target_icon} spawns on screen"
                     case NoteCheckOnScreenReason.DIFFERENT_TYPE:
-                        return f"{target_type.name} spawns from note of different type {issue.extra_info["Spawn Source"].get_type().name}"
+                        other_target = issue.extra_info["Spawn Source"].get_type()
+                        other_target_icon = target_list_to_rich_text([other_target])
+
+                        return f"{target_icon} spawns from note of different type {other_target_icon}"
                     case NoteCheckOnScreenReason.SAME_TYPE:
-                        return f"{target_type.name} spawns from note of same type"
+                        return f"{target_icon} spawns from note of same type"
                     case NoteCheckOnScreenReason.ITSELF:
-                        return f"{target_type.name} spawns from itself"
+                        return f"{target_icon} spawns from itself"
                     case _:
                         return f"Note spawn check returned Error"
             case NoteCheck.NOTE_PHANTOM:
@@ -139,7 +147,7 @@ class MainWindow(QMainWindow):
         for timestamp,issue in grouped_issues.items():
             issue_item = QTreeWidgetItem([str(timestamp)])
             target_list = issue[0].note.get_type()
-            note_image_list = target_list_to_rich_text_list(target_list)
+            note_image_list = target_list_to_rich_text(target_list)
             note_string = ""
             for note in note_image_list:
                 note_string = note_string + note
@@ -151,10 +159,11 @@ class MainWindow(QMainWindow):
             self.main_box.csfm_issues_treeview.setItemWidget(issue_item,1, label)
 
             for i in issue:
-                leaf = QTreeWidgetItem(
-                    [self.get_issue_description(i)]
-                )
+                issue_label = QLabel(self.get_issue_description(i))
+                issue_label.setTextFormat(Qt.TextFormat.RichText)
+                leaf = QTreeWidgetItem()
                 issue_item.addChild(leaf)
+                self.main_box.csfm_issues_treeview.setItemWidget(leaf,0, issue_label)
 
             self.main_box.csfm_issues_treeview.expandAll()
 if __name__ == "__main__":
