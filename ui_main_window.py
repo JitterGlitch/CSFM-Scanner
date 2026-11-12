@@ -129,7 +129,7 @@ class Ui_MainWindow(object):
 
         self.main_hbox_layout = QHBoxLayout(self.centralwidget)
         self.main_hbox_layout.addLayout(self.layout)
-        self.main_hbox_layout.addWidget(self.side_config_frame)
+        #self.main_hbox_layout.addWidget(self.side_config_frame)
 
     def update_dict(self,filter_dict,sub_issue_item):
         sub_issue =  sub_issue_item

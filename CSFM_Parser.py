@@ -283,7 +283,6 @@ def flying_time_to_beats(flying_time_percent):
     else:
         return 4.0
 
-#### Note Checks ####
 def position_check_with_tolerance(position, last_section_positions, precision=5.0):
     #Ideally autistic precision of 1 would be used,
     # that however is overkill for faster songs where it's hard to spot misalignment
@@ -422,6 +421,11 @@ class Target:
                 return check_info
 
             case Check.TARGET_SPAWN_ON_SCREEN:
+                if not bool(self.has_set_properties):
+                    check_result = False
+                    check_info.update({"Result": check_result})
+                    return check_info
+
                 point = round_position(self.get_spawn_point())
                 on_screen_result = self._check_if_point_in_visible_area(point)
 
@@ -450,10 +454,20 @@ class Target:
                 return check_info
 
             case Check.TARGET_PHANTOM:
+                if not bool(self.has_set_properties):
+                    check_result = False
+                    check_info.update({"Result": check_result})
+                    return check_info
+
                 check_result = self.distance == 0
                 check_info.update({"Result": check_result})
                 return check_info
             case Check.TARGET_INSIDE_GRID:
+                if not bool(self.has_set_properties):
+                    check_result = False
+                    check_info.update({"Result": check_result})
+                    return check_info
+
                 point = self.get_position()
                 if point is None:
                     return check_info

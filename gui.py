@@ -43,6 +43,61 @@ def target_list_to_rich_text(target_list):
 
     return rich_text
 
+
+def get_issue_description(issue: ChartIssue):
+    target_type = issue.get_target().get_type()
+    target_icon = target_list_to_rich_text([target_type])
+
+    print(issue.extra_info)
+
+    match issue.type:
+
+        case Check.TARGET_SPAWN_ON_SCREEN:
+            match issue.extra_info["Reason"]:
+                case TargetCheckOnScreenReason.ON_SCREEN:
+                    return f"{target_icon} spawns on screen"
+                case TargetCheckOnScreenReason.DIFFERENT_TYPE:
+                    other_target = issue.extra_info["Spawn Source"].get_type()
+                    other_target_icon = target_list_to_rich_text([other_target])
+
+                    return f"{target_icon} spawns from note of different type {other_target_icon}"
+                case TargetCheckOnScreenReason.SAME_TYPE:
+                    return f"{target_icon} spawns from note of same type"
+                case TargetCheckOnScreenReason.ITSELF:
+                    return f"{target_icon} spawns from itself"
+                case _:
+                    return f"Target spawn check returned Error"
+
+        case Check.TARGET_INSIDE_GRID:
+            match issue.extra_info["Reason"]:
+                case TargetCheckInsideGrid.INSIDE:
+                    return f"{target_icon} is placed inside the grid"
+                case TargetCheckInsideGrid.EDGE:
+                    return f"{target_icon} is placed on edge of the grid"
+                case TargetCheckInsideGrid.OUTSIDE:
+                    diff = issue.extra_info["Off by distance"]
+                    return f"{target_icon} is placed outside of the grid by {diff}"
+                case _:
+                    return f"Target inside grid check returned Error"
+
+        case Check.TARGET_PHANTOM:
+            return f"{target_icon} has 0 Distance"
+
+        case Check.TARGET_PROP_NOT_SET:
+            return f"{target_icon} uses default placements"
+
+
+        case _:
+            return f"Unimplemented error description"
+
+
+def build_issue_data_tree(chart_issues_list:list[ChartIssue]):
+    grouped = defaultdict(list)
+    for issue in chart_issues_list:
+        grouped[issue.timestamp].append(issue)
+    return dict(grouped)
+
+
 class MainWindow(QMainWindow):
     FilterChanged = Signal()
     def __init__(self):
@@ -60,7 +115,6 @@ class MainWindow(QMainWindow):
         self.watcher.fileChanged.connect(self.watcher_update)
         self.currently_loaded_csfm = None
 
-        self.load_csfm("/home/jitterglitch/PycharmProjects/CSFM-Helper/Test Data/JitterGlitch Chart Pack/FOMENT - 7 HD.csfm")
 
     def watcher_update(self,path):
         print("running")
@@ -97,66 +151,10 @@ class MainWindow(QMainWindow):
 
         self.display_issues()
 
-    def get_issue_description(self,issue: ChartIssue):
-        note_type = issue.get_note_type_string()
-        target_type = issue.get_target().get_type()
-        target_icon = target_list_to_rich_text([target_type])
-        precision = self.main_box.target_spawn_precision_combobox.currentEnum().name
-
-        print(issue.extra_info)
-
-        match issue.type:
-
-            case Check.TARGET_SPAWN_ON_SCREEN:
-                match issue.extra_info["Reason"]:
-                    case TargetCheckOnScreenReason.ON_SCREEN:
-                        return f"{target_icon} spawns on screen"
-                    case TargetCheckOnScreenReason.DIFFERENT_TYPE:
-                        other_target = issue.extra_info["Spawn Source"].get_type()
-                        other_target_icon = target_list_to_rich_text([other_target])
-
-                        return f"{target_icon} spawns from note of different type {other_target_icon}"
-                    case TargetCheckOnScreenReason.SAME_TYPE:
-                        return f"{target_icon} spawns from note of same type"
-                    case TargetCheckOnScreenReason.ITSELF:
-                        return f"{target_icon} spawns from itself"
-                    case _:
-                        return f"Target spawn check returned Error"
-
-            case Check.TARGET_INSIDE_GRID:
-                match issue.extra_info["Reason"]:
-                    case TargetCheckInsideGrid.INSIDE:
-                        return f"{target_icon} is placed inside the grid"
-                    case TargetCheckInsideGrid.EDGE:
-                        return f"{target_icon} is placed on edge of the grid"
-                    case TargetCheckInsideGrid.OUTSIDE:
-                        diff = issue.extra_info["Off by distance"]
-                        return f"{target_icon} is placed outside of the grid by {diff}"
-                    case _:
-                        return f"Target inside grid check returned Error"
-
-            case Check.TARGET_PHANTOM:
-                return f"{note_type} has 0 Distance"
-
-            case Check.TARGET_PROP_NOT_SET:
-                return f"{note_type} uses default placements"
-
-
-            case _:
-                return f"Unimplemented error description"
-
-    def build_issue_data_tree(self,chart_issues_list:list[ChartIssue]):
-        grouped = defaultdict(list)
-        for issue in chart_issues_list:
-            grouped[issue.timestamp].append(issue)
-        return dict(grouped)
-
-
-
     def display_issues(self):
         self.main_box.csfm_issues_treeview.clear()
 
-        grouped_issues = self.build_issue_data_tree(self.issues)
+        grouped_issues = build_issue_data_tree(self.issues)
 
         for timestamp,issue in grouped_issues.items():
             issue_item = QTreeWidgetItem([str(timestamp)])
@@ -173,7 +171,7 @@ class MainWindow(QMainWindow):
             self.main_box.csfm_issues_treeview.setItemWidget(issue_item,1, label)
 
             for i in issue:
-                issue_label = QLabel(self.get_issue_description(i))
+                issue_label = QLabel(get_issue_description(i))
                 issue_label.setTextFormat(Qt.TextFormat.RichText)
                 leaf = QTreeWidgetItem()
                 issue_item.addChild(leaf)
