@@ -130,7 +130,8 @@ class MainWindow(QMainWindow):
                     case TargetCheckInsideGrid.EDGE:
                         return f"{target_icon} is placed on edge of the grid"
                     case TargetCheckInsideGrid.OUTSIDE:
-                        return f"{target_icon} is placed outside of the grid"
+                        diff = issue.extra_info["Off by distance"]
+                        return f"{target_icon} is placed outside of the grid by {diff}"
                     case _:
                         return f"Target inside grid check returned Error"
 

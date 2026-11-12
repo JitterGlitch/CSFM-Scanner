@@ -241,6 +241,11 @@ class ChartIssue:
     def get_target(self):
         return self.target
 
+class GridPoints(NamedTuple):
+    x1 = 96
+    y1 = 192
+    x2 = 1824
+    y2 = 864
 class Point(NamedTuple):
     x: float
     y: float
@@ -377,7 +382,7 @@ class Target:
         return results_dict
 
     def _check_if_point_in_grid(self,point):
-        x_min, y_min, x_max, y_max = 96, 192, 1824, 864
+        x_min, y_min, x_max, y_max = GridPoints.x1, GridPoints.y1, GridPoints.x2, GridPoints.y2
 
         return x_min <= point.x <= x_max and y_min <= point.y <= y_max
 
@@ -453,17 +458,29 @@ class Target:
                 if point is None:
                     return check_info
 
-                if point.x in (96, 1824):
+                if point.x in (GridPoints.x1, GridPoints.x2):
                     check_info.update({"Result": True,
                                        "Reason": TargetCheckInsideGrid.EDGE})
-                if point.y in (192, 864):
+                if point.y in (GridPoints.y1, GridPoints.y2):
                     check_info.update({"Result": True,
                                        "Reason": TargetCheckInsideGrid.EDGE})
 
                 if not self._check_if_point_in_grid(point):
+                    diff_x , diff_y = 0, 0
+                    if point.x > GridPoints.x2:
+                        diff_x = point.x - GridPoints.x2
+                    elif GridPoints.x1 > point.x:
+                        diff_x = abs(point.x - GridPoints.x1)
+
+                    if point.y > GridPoints.y2:
+                        diff_y = point.y - GridPoints.y2
+                    elif GridPoints.y1 > point.y:
+                        diff_y = abs(point.y - GridPoints.y1)
+
 
                     check_info.update({"Result": True,
-                                       "Reason": TargetCheckInsideGrid.OUTSIDE})
+                                       "Reason": TargetCheckInsideGrid.OUTSIDE,
+                                       "Off by distance": (diff_x,diff_y)})
 
 
                 return check_info
