@@ -120,6 +120,7 @@ class Ui_MainWindow(object):
         self.csfm_issues_treeview = QTreeWidget()
         self.csfm_issues_treeview.setMinimumWidth(600)
         self.csfm_issues_treeview.setHeaderLabels(["Timestamp","Note"])
+        self.csfm_issues_treeview.setColumnWidth(0, 400)
         self.csfm_issues_treeview.setSortingEnabled(True)
 
         self.layout.addWidget(self.button)

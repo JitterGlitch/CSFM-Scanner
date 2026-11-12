@@ -166,6 +166,7 @@ class MainWindow(QMainWindow):
                 self.main_box.csfm_issues_treeview.setItemWidget(leaf,0, issue_label)
 
             self.main_box.csfm_issues_treeview.expandAll()
+            self.main_box.csfm_issues_treeview.header().setSortIndicator(0, Qt.SortOrder.AscendingOrder)
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
