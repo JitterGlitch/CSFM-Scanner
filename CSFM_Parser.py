@@ -443,7 +443,7 @@ class Target:
                             check_info["Reason"] = TargetCheckOnScreenReason.ON_SCREEN
                         case Target():
                             target = spawn_source
-                            if target.get_type() == self.get_type():
+                            if TargetTypes.get_base_note(target.get_type()) == self.get_type():
                                 if target.position == self.position:
                                     check_info["Reason"] = TargetCheckOnScreenReason.ITSELF
                                 else:

@@ -12,8 +12,6 @@ from CSFM_Parser import CsfmParser, DifficultyOutput, Check, ChartIssue, TargetP
 
 def target_list_to_rich_text(target_list):
     rich_text = ""
-    #TODO: Labels support images via rich-text.
-    # Use that instead
 
     for target in target_list:
         base_note = TargetTypes.get_base_note(target)
